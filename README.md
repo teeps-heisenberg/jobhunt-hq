@@ -35,7 +35,7 @@ pnpm lint          # ESLint (flat config, typescript-eslint)
 pnpm format:check  # Prettier, code files only
 pnpm test          # Vitest, including the .gitignore guard in tests/
 pnpm check         # all of the above, same as CI
-pnpm jh            # the CLI (commands land in M1 task 6)
+pnpm jh            # the CLI, see below
 ```
 
 CI runs the same four checks on every push and pull request (`.github/workflows/ci.yml`).
@@ -51,6 +51,21 @@ SQLite via Drizzle and better-sqlite3, at `data/jobhunt.db` (override with `JH_D
 
 ### Scoring
 `packages/core/src/scoring.ts` computes the number; the LLM writes the why and gap text. `findBlockers()` returns a reason for each hard blocker (years above `rules.experience.maxYearsBar`, excluded location, security clearance, citizenship or work authorisation the user lacks, a required language below professional level); any blocker means `Skipped` with score 0. Otherwise five factors (skills overlap with the master CV, years fit, location and visa, recency, salary against `rules.salary`) are weighted by `rules.scoring.weights` into a 0 to 5 score, and `rules.scoring.shortlistAt` (default 4) decides between `Shortlisted` and `New`. Every factor carries a one-line note so the dashboard can explain the number.
+
+### CLI (`pnpm jh`)
+Skills call these; nothing else writes to the database.
+
+```
+pnpm jh add-jobs <file.json> [--focus text] [--dry-run] [--json]
+pnpm jh list [--status S]... [--min-score N] [--company C] [--source S] [--batch B] [--due] [--limit N] [--format table|json|ids]
+pnpm jh set-status <id> <status> [--note text] [--follow-up YYYY-MM-DD]
+pnpm jh note <id> <text>
+pnpm jh score <id> [--why text] [--gap text] [--visa-note text] [--min-years N] [--requirements "a, b"]
+pnpm jh stats [--json]
+pnpm jh export-csv [file]
+```
+
+`add-jobs` accepts a JSON array of scout rows or `{jobs, rejected}`, validates them against `JobInput`, dedupes against the tracker and within the batch, scores each new row with the rules and `data/master.json`, and records a search run. Moving a job to `Applied` sets the follow-up date from `rules.followUpDays` unless `--follow-up` is given. Global options: `--db <path>` (or `JH_DB`), `--config-dir <dir>`, `--master <file>`.
 
 ## Status
 Work in progress. See `docs/SPEC.md` and `docs/TASKS.md`.
