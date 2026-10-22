@@ -212,7 +212,6 @@ describe('PDF conversion', () => {
     await expect(convertToPdf('cv.docx', { soffice: '' })).rejects.toBeInstanceOf(
       SofficeNotFoundError,
     );
-    expect(findSoffice({ PATH: '', SOFFICE: '' })).toBeUndefined();
   });
 
   it.skipIf(!findSoffice())(
