@@ -67,6 +67,14 @@ pnpm jh export-csv [file]
 
 `add-jobs` accepts a JSON array of scout rows or `{jobs, rejected}`, validates them against `JobInput`, dedupes against the tracker and within the batch, scores each new row with the rules and `data/master.json`, and records a search run. Moving a job to `Applied` sets the follow-up date from `rules.followUpDays` unless `--follow-up` is given. Global options: `--db <path>` (or `JH_DB`), `--config-dir <dir>`, `--master <file>`.
 
+### Resume package
+`packages/resume` turns `data/master.json` into a tailored CV without inventing anything:
+- `Master` (zod) is the master CV schema; `data/examples/master.json` is a fictional example.
+- `buildVariant(master, spec)` applies a `VariantSpec` (title, summary by key or text, skill order and overrides, project order and cap, bullets per position) and returns the resume plus `newClaims`: every piece of text that is not in the master, for the "Verify before sending" list.
+- `renderDocx(resume)` is the prototype `scripts/resume/build-docx.js` ported to TypeScript (Letter, Arial, navy headings).
+- `convertToPdf(docx)` runs `soffice --headless --convert-to pdf`. It needs LibreOffice: install it or set `SOFFICE` to the binary. `checkPages(pdf, rules.style.maxPages)` counts pages with pdf-lib and insists on the exact count.
+- `lintText(text, { bannedCharacters, bannedPhrases })` flags em dashes by default plus anything from `rules.style`, with line and column.
+
 ## Status
 Work in progress. See `docs/SPEC.md` and `docs/TASKS.md`.
 

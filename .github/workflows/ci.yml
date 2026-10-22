@@ -25,6 +25,11 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
+      - name: Install LibreOffice (PDF rendering tests)
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends libreoffice-writer
+
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm typecheck
