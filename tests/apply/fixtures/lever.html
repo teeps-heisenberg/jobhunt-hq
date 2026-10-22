@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fixture: Lever-style application form</title>
+  </head>
+  <body>
+    <h1>AI Engineer</h1>
+    <form
+      id="application-form"
+      onsubmit="
+        window.__submitted = true;
+        return false;
+      "
+    >
+      <div class="application-question">
+        <div class="application-label">Full name<span>✱</span></div>
+        <input name="name" type="text" placeholder="Full name" aria-label="Full name" />
+      </div>
+      <div class="application-question">
+        <div class="application-label">Email<span>✱</span></div>
+        <input name="email" type="email" placeholder="Email" aria-label="Email" />
+      </div>
+      <div class="application-question">
+        <div class="application-label">Phone</div>
+        <input name="phone" type="text" placeholder="Phone" aria-label="Phone" />
+      </div>
+      <div class="application-question">
+        <div class="application-label">Current location</div>
+        <input
+          name="location"
+          type="text"
+          placeholder="Current location"
+          aria-label="Current location"
+        />
+      </div>
+      <div class="application-question">
+        <div class="application-label">Resume/CV<span>✱</span></div>
+        <input name="resume" type="file" aria-label="Resume/CV" />
+      </div>
+      <div class="application-question">
+        <div class="application-label">LinkedIn URL</div>
+        <input
+          name="urls[LinkedIn]"
+          type="text"
+          placeholder="LinkedIn URL"
+          aria-label="LinkedIn URL"
+        />
+      </div>
+      <div class="application-question">
+        <div class="application-label">GitHub URL</div>
+        <input name="urls[GitHub]" type="text" placeholder="GitHub URL" aria-label="GitHub URL" />
+      </div>
+      <div class="application-question">
+        <div class="application-label">Additional information</div>
+        <textarea
+          name="comments"
+          placeholder="Add a cover letter or anything else you want to share."
+          aria-label="Additional information"
+        ></textarea>
+      </div>
+      <div class="application-question">
+        <div class="application-label">Expected salary</div>
+        <input name="cards[salary]" type="text" aria-label="Expected salary" />
+      </div>
+      <div class="application-question">
+        <div class="application-label">Password for your candidate account</div>
+        <input name="password" type="password" aria-label="Password" />
+      </div>
+      <div class="application-question">
+        <label>
+          <input
+            name="consent"
+            type="checkbox"
+            onclick="window.__consentClicked = true"
+            aria-label="I agree to the privacy policy"
+          />
+          I agree to the privacy policy
+        </label>
+      </div>
+      <button type="submit" class="postings-btn" onclick="window.__submitClicked = true">
+        Submit application
+      </button>
+    </form>
+  </body>
+</html>

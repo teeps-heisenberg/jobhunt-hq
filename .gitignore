@@ -4,6 +4,8 @@ node_modules/
 next-env.d.ts
 dist/
 coverage/
+test-results/
+playwright-report/
 *.tsbuildinfo
 
 # Secrets

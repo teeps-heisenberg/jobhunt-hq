@@ -36,3 +36,8 @@ jobs:
       - run: pnpm lint
       - run: pnpm format:check
       - run: pnpm test
+
+      - name: Install Chromium for the apply-assist fixture test
+        run: pnpm exec playwright install --with-deps chromium
+
+      - run: pnpm test:e2e

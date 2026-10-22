@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fixture: Greenhouse-style application form</title>
+  </head>
+  <body>
+    <h1>Full Stack Engineer</h1>
+    <form
+      id="application_form"
+      onsubmit="
+        window.__submitted = true;
+        return false;
+      "
+    >
+      <label for="first_name">First Name *</label>
+      <input id="first_name" name="job_application[first_name]" type="text" required />
+
+      <label for="last_name">Last Name *</label>
+      <input id="last_name" name="job_application[last_name]" type="text" required />
+
+      <label for="email">Email *</label>
+      <input id="email" name="job_application[email]" type="email" required />
+
+      <label for="phone">Phone</label>
+      <input id="phone" name="job_application[phone]" type="tel" />
+
+      <label for="resume">Resume/CV *</label>
+      <input id="resume" name="job_application[resume]" type="file" />
+
+      <label for="cover_letter_text">Cover Letter</label>
+      <textarea id="cover_letter_text" name="job_application[cover_letter_text]"></textarea>
+
+      <label for="linkedin">LinkedIn Profile</label>
+      <input id="linkedin" name="job_application[answers_attributes][0][text_value]" type="text" />
+
+      <label for="years">How many years of professional experience do you have?</label>
+      <input id="years" name="job_application[answers_attributes][1][text_value]" type="text" />
+
+      <label for="auth">Are you authorized to work in the EU?</label>
+      <textarea id="auth" name="job_application[answers_attributes][2][text_value]"></textarea>
+
+      <label for="dob">Date of birth</label>
+      <input id="dob" name="job_application[answers_attributes][3][text_value]" type="text" />
+
+      <label>
+        <input
+          id="gdpr"
+          name="job_application[gdpr_consent]"
+          type="checkbox"
+          onclick="window.__consentClicked = true"
+        />
+        I consent to the processing of my personal data (GDPR)
+      </label>
+
+      <button id="submit_app" type="submit" onclick="window.__submitClicked = true">
+        Submit Application
+      </button>
+    </form>
+  </body>
+</html>

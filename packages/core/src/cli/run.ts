@@ -28,6 +28,7 @@ import {
   writeDocx,
 } from '@jobhunt-hq/resume';
 
+import { buildApplyPlan } from '../apply.js';
 import { ConfigError, loadConfig, loadProfile, loadRules } from '../config.js';
 import { openDb, type Tracker } from '../db/client.js';
 import {
@@ -86,6 +87,8 @@ Commands
                              (--variant spec.json, --no-pdf)
   pack <id> --from pack.json write output/<company>/<role>/pack.md and cover.docx with
                              screening answers from the rules and the verify list
+  apply-plan <id>            fields the apply-assist skill may fill, with values and sources
+                             (--from pack.json, --json)
   stats                      funnel and follow-ups due
   export-csv [file]          export every job as CSV (stdout when no file)
   import-cv <file>           extract text from a DOCX, PDF or TXT CV into data/imports/
@@ -225,6 +228,7 @@ const COMMANDS: Record<string, Handler> = {
   show,
   tailor,
   pack,
+  'apply-plan': applyPlan,
   stats,
   'export-csv': exportCsv,
   'import-cv': importCvCmd,
@@ -1196,4 +1200,65 @@ function longDate(iso: string): string {
     year: 'numeric',
     timeZone: 'UTC',
   });
+}
+
+// ---------------------------------------------------------------------------
+// apply-plan
+// ---------------------------------------------------------------------------
+
+const PackHints = z
+  .object({
+    coverNote: z.array(z.string()).optional(),
+    screening: z.array(z.object({ question: z.string(), answer: z.string() })).optional(),
+  })
+  .passthrough();
+
+function applyPlan(ctx: Ctx): void {
+  const [id] = ctx.positionals;
+  const job = requireJob(ctx, id);
+  const { profile, rules } = loadRulesAndProfile(ctx);
+  const artifacts = listArtifacts(ctx.tracker().db, job.id);
+  const latest = (kind: string) => artifacts.find((a) => a.kind === kind)?.path;
+
+  let hints: z.infer<typeof PackHints> = {};
+  const packPath = resolve(
+    ctx.cwd,
+    ctx.values.from ?? join('data', 'scout', `${job.id}.pack.json`),
+  );
+  if (existsSync(packPath)) {
+    const parsed = PackHints.safeParse(JSON.parse(readFileSync(packPath, 'utf8')));
+    if (parsed.success) hints = parsed.data;
+    else ctx.io.err(`warning: ${packPath} is not a pack file, ignoring it`);
+  } else if (ctx.values.from) {
+    throw new CliError(`File not found: ${packPath}`, 2);
+  }
+
+  const plan = buildApplyPlan({
+    job,
+    profile,
+    rules,
+    coverNote: hints.coverNote,
+    screening: hints.screening,
+    cvPath: latest('cv_pdf') ?? latest('cv_docx'),
+    coverPath: latest('cover'),
+  });
+
+  if (ctx.values.json) {
+    ctx.io.out(JSON.stringify(plan, null, 2));
+    return;
+  }
+  ctx.io.out(`${job.id}: ${plan.applyUrl}`);
+  ctx.io.out(`  fields (${plan.fields.length}):`);
+  for (const f of plan.fields) {
+    const value = f.value.includes('\n') ? `${f.value.split('\n')[0]}...` : f.value;
+    ctx.io.out(`    ${f.key.padEnd(16)} ${truncate(value, 60).padEnd(60)} ${f.source}`);
+  }
+  ctx.io.out(
+    plan.uploads.length
+      ? '  uploads (attach yourself):'
+      : '  uploads: none recorded, run jh tailor first',
+  );
+  for (const u of plan.uploads) ctx.io.out(`    ${u.key.padEnd(16)} ${u.path}`);
+  ctx.io.out('  left for you:');
+  for (const s of plan.stopBefore) ctx.io.out(`    - ${s}`);
 }

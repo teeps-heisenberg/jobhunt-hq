@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fixture: Ashby-style application form</title>
+  </head>
+  <body>
+    <h1>Forward Deployed Engineer</h1>
+    <form
+      id="ashby-form"
+      onsubmit="
+        window.__submitted = true;
+        return false;
+      "
+    >
+      <div class="field">
+        <label for="_systemfield_name">Name<span>*</span></label>
+        <input id="_systemfield_name" name="_systemfield_name" type="text" />
+      </div>
+      <div class="field">
+        <label for="_systemfield_email">Email<span>*</span></label>
+        <input id="_systemfield_email" name="_systemfield_email" type="email" />
+      </div>
+      <div class="field">
+        <label for="_systemfield_resume">Resume<span>*</span></label>
+        <input id="_systemfield_resume" name="_systemfield_resume" type="file" />
+      </div>
+      <div class="field">
+        <label for="q1">Why do you want to work here?</label>
+        <textarea id="q1" name="q1"></textarea>
+      </div>
+      <div class="field">
+        <label for="q2">What is your notice period or earliest start date?</label>
+        <input id="q2" name="q2" type="text" />
+      </div>
+      <div class="field">
+        <label for="q3">Do you now or in the future require visa sponsorship?</label>
+        <textarea id="q3" name="q3"></textarea>
+      </div>
+      <div class="field">
+        <label for="q4">Portfolio or website</label>
+        <input id="q4" name="q4" type="text" />
+      </div>
+      <div class="field">
+        <label for="q5">Years of experience with TypeScript</label>
+        <select id="q5" name="q5">
+          <option value="">Select...</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4+">4+</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="q6">National ID or passport number</label>
+        <input id="q6" name="q6" type="text" />
+      </div>
+      <div class="field">
+        <label>
+          <input id="terms" name="terms" type="checkbox" onclick="window.__consentClicked = true" />
+          I have read and accept the terms
+        </label>
+      </div>
+      <button
+        type="button"
+        onclick="
+          window.__submitClicked = true;
+          window.__submitted = true;
+        "
+      >
+        Submit Application
+      </button>
+    </form>
+  </body>
+</html>

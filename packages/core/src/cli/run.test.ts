@@ -695,3 +695,42 @@ describe('pack', () => {
     expect(await jh('pack', 'missing', '--from', 'pack.json')).toBe(1);
   });
 });
+
+describe('apply-plan', () => {
+  it('prints fields from profile, rules, pack and artifacts', async () => {
+    await jh('add-jobs', writeScout('one.json', [scoutRows[0]]));
+    await jh('tailor', 'acme-full-stack-engineer-eu', '--no-pdf');
+    writeFileSync(
+      join(cwd, 'pack.json'),
+      JSON.stringify({
+        coverNote: ['Hello Acme.'],
+        screening: [{ question: 'Why Acme?', answer: 'Stack.' }],
+      }),
+    );
+    out = [];
+    expect(
+      await jh('apply-plan', 'acme-full-stack-engineer-eu', '--from', 'pack.json', '--json'),
+    ).toBe(0);
+    const plan = JSON.parse(out.join('\n'));
+    expect(plan.applyUrl).toBe('https://boards.greenhouse.io/acme/jobs/111');
+    expect(plan.fields.map((f: { key: string }) => f.key)).toEqual(
+      expect.arrayContaining([
+        'firstName',
+        'email',
+        'years',
+        'salary',
+        'coverLetter',
+        'screening:Why Acme?',
+      ]),
+    );
+    expect(plan.uploads).toEqual([
+      expect.objectContaining({ key: 'cv', path: 'output/acme/full-stack-engineer/cv.docx' }),
+    ]);
+
+    out = [];
+    expect(await jh('apply-plan', 'acme-full-stack-engineer-eu')).toBe(0);
+    expect(out.join('\n')).toMatch(/firstName\s+Sam\s+profile\.name/);
+    expect(out.join('\n')).toContain('Review every filled field, then click Submit yourself.');
+    expect(await jh('apply-plan', 'acme-full-stack-engineer-eu', '--from', 'none.json')).toBe(2);
+  });
+});
