@@ -46,6 +46,9 @@ CI runs the same four checks on every push and pull request (`.github/workflows/
 ### Tracker database
 SQLite via Drizzle and better-sqlite3, at `data/jobhunt.db` (override with `JH_DB`). `openDb()` in `packages/core/src/db/client.ts` creates the file and applies the SQL migrations in `packages/core/drizzle/` on every open. Tables: `jobs`, `artifacts`, `events` (the audit trail), `searches`. Repository functions in `db/repo.ts` (`insertJobs`, `listJobs`, `setStatus`, `addNote`, `addArtifact`, `recordSearch`, `getStats`) validate every row with zod on the way out. After changing `db/tables.ts`, run `pnpm --filter @jobhunt-hq/core db:generate` and commit the new migration.
 
+### Dedupe
+`packages/core/src/dedupe.ts` decides whether a scouted posting is already tracked, strongest evidence first: the same ATS job id (Greenhouse, Lever, Ashby, Workable, Workday, SmartRecruiters), the same normalised URL, the same normalised company + title + location, then a fuzzy title match at the same company and location (reposts with small wording changes). Seniority words never merge. The same title at the same company in another location is reported as a regional variant, not dropped. `makeJobId()` builds the `company-title-city` slug used as the tracker id.
+
 ## Status
 Work in progress. See `docs/SPEC.md` and `docs/TASKS.md`.
 
