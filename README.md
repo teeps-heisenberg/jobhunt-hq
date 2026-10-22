@@ -49,6 +49,9 @@ SQLite via Drizzle and better-sqlite3, at `data/jobhunt.db` (override with `JH_D
 ### Dedupe
 `packages/core/src/dedupe.ts` decides whether a scouted posting is already tracked, strongest evidence first: the same ATS job id (Greenhouse, Lever, Ashby, Workable, Workday, SmartRecruiters), the same normalised URL, the same normalised company + title + location, then a fuzzy title match at the same company and location (reposts with small wording changes). Seniority words never merge. The same title at the same company in another location is reported as a regional variant, not dropped. `makeJobId()` builds the `company-title-city` slug used as the tracker id.
 
+### Scoring
+`packages/core/src/scoring.ts` computes the number; the LLM writes the why and gap text. `findBlockers()` returns a reason for each hard blocker (years above `rules.experience.maxYearsBar`, excluded location, security clearance, citizenship or work authorisation the user lacks, a required language below professional level); any blocker means `Skipped` with score 0. Otherwise five factors (skills overlap with the master CV, years fit, location and visa, recency, salary against `rules.salary`) are weighted by `rules.scoring.weights` into a 0 to 5 score, and `rules.scoring.shortlistAt` (default 4) decides between `Shortlisted` and `New`. Every factor carries a one-line note so the dashboard can explain the number.
+
 ## Status
 Work in progress. See `docs/SPEC.md` and `docs/TASKS.md`.
 

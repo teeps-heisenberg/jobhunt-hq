@@ -290,7 +290,13 @@ export const Rules = z.object({
       custom: z.array(NonEmpty).default([]),
     })
     .default({ bigTech: true, ats: DEFAULT_ATS, remote: [], research: false, custom: [] }),
-  scoring: z.object({ weights: ScoringWeights }).default({ weights: DEFAULT_WEIGHTS }),
+  scoring: z
+    .object({
+      weights: ScoringWeights.default(DEFAULT_WEIGHTS),
+      /** Scores at or above this are suggested as Shortlisted; below, New. */
+      shortlistAt: z.number().min(0).max(5).default(4),
+    })
+    .default({ weights: DEFAULT_WEIGHTS, shortlistAt: 4 }),
   followUpDays: z.number().int().min(1).default(10),
 });
 export type Rules = z.infer<typeof Rules>;
