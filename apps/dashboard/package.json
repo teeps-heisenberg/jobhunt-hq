@@ -2,23 +2,27 @@
   "name": "@jobhunt-hq/dashboard",
   "version": "0.0.0",
   "private": true,
-  "description": "Local dashboard on the tracker database (Next.js arrives in M3).",
+  "description": "Local dashboard on the tracker database: table, kanban, job pages and stats.",
   "license": "MIT",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    }
-  },
-  "files": [
-    "dist"
-  ],
   "scripts": {
-    "build": "tsc -b",
-    "typecheck": "tsc -b",
+    "dev": "pnpm --filter @jobhunt-hq/core build && next dev --port 3000",
+    "build": "pnpm --filter @jobhunt-hq/core build && next build",
+    "start": "next start --port 3000",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run --root ../.. apps/dashboard"
+  },
+  "dependencies": {
+    "@jobhunt-hq/core": "workspace:*",
+    "better-sqlite3": "^13.0.3",
+    "next": "^15.5.28",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "tailwindcss": "^4.3.3"
   }
 }

@@ -31,9 +31,9 @@ scripts/resume     prototype JS renderers to port into packages/resume
 - No em dashes in any generated application text (style lint enforces it).
 - The definition of done for a task: typecheck, lint and tests pass; the relevant README section is updated.
 
-## Useful commands (once M1 is done)
+## Useful commands
 - `pnpm jh add-jobs <file.json>`: validate, dedupe and insert scored jobs
 - `pnpm jh set-status <id> <status> [--note ...]`
 - `pnpm jh tailor <id> --variant <variant.json>`: render CV DOCX and PDF, check pages, lint style
 - `pnpm jh list --status Shortlisted --min-score 4`
-- `pnpm dev`: dashboard on http://localhost:3000
+- `pnpm dev`: dashboard on http://localhost:3000; `pnpm demo`: the same on a seeded throwaway database

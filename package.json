@@ -11,14 +11,17 @@
     "pnpm": ">=10"
   },
   "scripts": {
-    "typecheck": "tsc -b tsconfig.json",
+    "typecheck": "tsc -b tsconfig.json && pnpm --filter @jobhunt-hq/dashboard typecheck",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test",
-    "jh": "pnpm --filter @jobhunt-hq/core run jh"
+    "jh": "pnpm --filter @jobhunt-hq/core run jh",
+    "dev": "pnpm --filter @jobhunt-hq/dashboard dev",
+    "build": "pnpm --filter @jobhunt-hq/dashboard build",
+    "demo": "node scripts/demo.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

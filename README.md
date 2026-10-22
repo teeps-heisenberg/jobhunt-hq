@@ -35,6 +35,8 @@ pnpm lint          # ESLint (flat config, typescript-eslint)
 pnpm format:check  # Prettier, code files only
 pnpm test          # Vitest, including the .gitignore guard in tests/
 pnpm check         # all of the above, same as CI
+pnpm dev           # dashboard on http://localhost:3000 (builds packages/core first)
+pnpm demo          # dashboard on a throwaway database seeded from data/examples
 pnpm jh            # the CLI, see below
 ```
 
@@ -98,6 +100,9 @@ pnpm jh scout-brief <group> [--focus text] [--out file]
 
 ### Pack skill (`/pack`)
 `.claude/skills/pack/SKILL.md` writes `data/scout/<id>.pack.json` (cover note paragraphs, why this role, extra screening answers, posting notes, verify items) and runs `pnpm jh pack <id> --from <that file>`. The command adds the standard screening answers from the rules (years from the profile, the `rules.salary` band for the job's location with "flexible", notice period, work authorisation), merges the verify items the tailored CV already carries, renders `output/<company>/<role>/pack.md` and `cover.docx`, lints the text, and records both as artifacts.
+
+### Dashboard
+`apps/dashboard` is a Next.js 15 app (App Router, Tailwind 4) on the same SQLite file as the CLI, read and written only through `@jobhunt-hq/core`. Pages: a table with filters (search, status, min score, region, remote, batch, found since), a kanban board where dragging a card changes the status and records the event, a job page with posting links, why and gap, artifacts and their verify items, the timeline, and forms for status, follow-up date and notes, and a stats page with the funnel and responses by source. `pnpm dev` starts it on your tracker; `pnpm demo` seeds `data/demo/jobhunt.db` from the fictional `data/examples/jobs.json` and starts it there, without touching your data. Set `JH_DB` to point the dashboard at another file.
 
 ## Status
 Work in progress. See `docs/SPEC.md` and `docs/TASKS.md`.

@@ -10,11 +10,16 @@ export default tseslint.config(
       '**/dist/**',
       '**/.next/**',
       '**/coverage/**',
+      '**/next-env.d.ts',
       'scripts/resume/**',
       'output/**',
     ],
   },
   js.configs.recommended,
+  {
+    files: ['**/*.mjs', '**/*.cjs'],
+    languageOptions: { globals: { process: 'readonly', console: 'readonly', Buffer: 'readonly' } },
+  },
   ...tseslint.configs.recommended,
   {
     files: ['**/*.ts', '**/*.tsx'],

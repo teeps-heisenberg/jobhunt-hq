@@ -452,7 +452,7 @@ describe('show, import-cv, doctor', () => {
       /^ok {3}data\/master\.json\s+Sam Rivera, 2 positions, 3 projects, 6 skill groups$/m,
     );
     expect(text).toMatch(/^ok {3}database\s+.*jobhunt\.db \(0 jobs\)$/m);
-    expect(text).toMatch(/^(ok {3}|FAIL) LibreOffice/m);
+    expect(text).toMatch(/^(ok {2}|FAIL) LibreOffice/m);
 
     writeFileSync(join(cwd, 'data/master.json'), JSON.stringify({ name: 'X' }));
     out = [];

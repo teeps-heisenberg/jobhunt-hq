@@ -1,9 +1,14 @@
 {
   "files": [],
   "references": [
-    { "path": "packages/core" },
-    { "path": "packages/resume" },
-    { "path": "apps/dashboard" },
-    { "path": "tests" }
+    {
+      "path": "packages/core"
+    },
+    {
+      "path": "packages/resume"
+    },
+    {
+      "path": "tests"
+    }
   ]
 }
