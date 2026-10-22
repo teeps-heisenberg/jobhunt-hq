@@ -1,0 +1,34 @@
+# Copy to config/rules.yaml (git-ignored) and adjust.
+locations:
+  remoteFrom: [Portugal, EU]                      # remote roles you can take
+  relocate: [London, Dublin, Amsterdam, Berlin, Toronto]
+  exclude: [India]                                # e.g. visa not realistic
+visa:
+  needsSponsorshipOutside: [EU]
+  skipIf: [citizenship required, security clearance, national of]
+experience:
+  maxYearsBar: 4                                  # skip roles asking more than this
+hardBlockers:
+  languagesRequired: [German, French, Arabic]     # skip if fluency required and you lack it
+recencyDays: 60
+salary:                                           # used in screening answers; always add "flexible"
+  remote: USD 2,500-3,500/month
+  London: GBP 45-55K
+  Dublin: EUR 50-60K
+  Amsterdam: EUR 55-65K
+style:
+  maxPages: 2
+  bannedCharacters: ["—"]
+  projectOrder: [ProjectA, ProjectB, ProjectC]
+caps:
+  google: {applications: 3, perDays: 30}
+  dailyApplications: 10
+sources:
+  bigTech: true
+  ats: [greenhouse, lever, ashby, workable]
+  remote: [weworkremotely.com, remoteok.com, arc.dev, himalayas.app]
+  research: true
+  custom: [relocue.com]
+scoring:
+  weights: {skills: 0.4, years: 0.2, location: 0.2, recency: 0.1, salary: 0.1}
+followUpDays: 10

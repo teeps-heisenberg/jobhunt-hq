@@ -1,0 +1,12 @@
+node_modules/
+.next/
+dist/
+coverage/
+.env*
+config/*.yaml
+!config/*.example.yaml
+data/*
+!data/examples/
+output/
+*.db
+*.db-journal

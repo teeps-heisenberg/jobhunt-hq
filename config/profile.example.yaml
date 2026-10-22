@@ -1,0 +1,13 @@
+# Copy to config/profile.yaml (git-ignored) and fill in.
+name: Sam Rivera
+contact:
+  email: sam@example.com
+  phone: "+1 555 0100"
+  location: Lisbon, Portugal
+  links: [https://github.com/samrivera, https://linkedin.com/in/samrivera]
+citizenship: [Portugal]          # where you can work without sponsorship
+yearsExperience: 3
+languages: [{name: English, level: fluent}, {name: Portuguese, level: native}]
+targetTitles: [Full Stack Engineer, AI Engineer, Forward Deployed Engineer, Solutions Engineer]
+noticePeriod: 1 month
+neverClaim: [Kubernetes in production, Java in production, PhD]

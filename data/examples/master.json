@@ -1,0 +1,19 @@
+{
+  "name": "Sam Rivera",
+  "title": "Full Stack Engineer | TypeScript, React, Node.js | Applied AI",
+  "contact": ["Lisbon, Portugal  |  sam@example.com  |  +1 555 0100", "github.com/samrivera | linkedin.com/in/samrivera", "English (fluent) · Portuguese (native)  |  Remote or relocation"],
+  "summary": "Full stack engineer with 3 years building SaaS products in TypeScript and Python, including LLM features in production.",
+  "skills": [["Languages", "TypeScript, JavaScript, Python, SQL"], ["Frontend", "React, Next.js, Tailwind CSS"], ["Backend", "Node.js, NestJS, FastAPI, REST, GraphQL"], ["AI / ML", "OpenAI API, RAG, evaluation sets"], ["Data & Cloud", "PostgreSQL, Redis, Docker, AWS"], ["Practices", "TDD, code review, CI/CD, Agile"]],
+  "experience": [
+    {"role": "Software Engineer", "company": "Example SaaS Ltd", "location": "Remote", "dates": "Jan 2024 – Present", "bullets": ["Built a multi-tenant scheduling product on Next.js, NestJS and PostgreSQL used by 200 clinics.", "Shipped an LLM-based summarisation feature with an evaluation set re-run before every prompt change."]},
+    {"role": "Junior Developer", "company": "Example Agency", "location": "Lisbon, Portugal", "dates": "Jun 2023 – Dec 2023", "bullets": ["Delivered client websites and REST APIs in TypeScript and Python."]}
+  ],
+  "projects": [
+    {"name": "ProjectA – Scheduling SaaS", "tech": "Next.js, NestJS, PostgreSQL", "desc": "Multi-tenant scheduling with billing and calendar sync."},
+    {"name": "ProjectB – Document AI", "tech": "Python, FastAPI, OpenAI", "desc": "Extracts structured data from PDFs with validation and human review."},
+    {"name": "ProjectC – Analytics Assistant", "tech": "React, FastAPI", "desc": "Natural-language questions over a sports statistics API."}
+  ],
+  "education": [["BSc Computer Science", "University of Lisbon", "", "2023"]],
+  "certifications": ["AWS Cloud Practitioner"],
+  "additional": []
+}
