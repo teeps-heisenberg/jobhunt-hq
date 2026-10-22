@@ -1,0 +1,25 @@
+{
+  "name": "@jobhunt-hq/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Schemas, scoring, dedupe, SQLite tracker and the jh CLI.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "vitest run --root ../.. packages/core",
+    "jh": "tsx src/cli.ts"
+  }
+}

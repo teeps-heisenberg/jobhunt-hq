@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.next/
+coverage/
+pnpm-lock.yaml
+output/
+data/
+!data/examples/
+scripts/resume/
+
+# Prose and user-facing config are hand-formatted; Prettier checks code only.
+*.md
+.claude/
+config/
+docs/

@@ -1,10 +1,18 @@
+# Dependencies and build output
 node_modules/
 .next/
 dist/
 coverage/
+*.tsbuildinfo
+
+# Secrets
 .env*
+
+# Personal data stays local (SPEC section 2, "Local first")
 config/*.yaml
+config/*.yml
 !config/*.example.yaml
+!config/*.example.yml
 data/*
 !data/examples/
 output/

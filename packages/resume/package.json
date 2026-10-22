@@ -1,0 +1,24 @@
+{
+  "name": "@jobhunt-hq/resume",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Master CV schema, variant builder, DOCX and PDF render, page check and style lint.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "vitest run --root ../.. packages/resume"
+  }
+}

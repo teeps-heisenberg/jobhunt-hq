@@ -1,0 +1,7 @@
+packages:
+  - packages/*
+  - apps/*
+
+# Only these dependencies may run install scripts (pnpm asks otherwise).
+allowBuilds:
+  esbuild: true

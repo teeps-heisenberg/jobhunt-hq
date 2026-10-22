@@ -25,6 +25,21 @@ dashboard (localhost:3000) → table, kanban, follow-ups, stats
 ## Quick start
 _Coming in v0.1.0._ Clone the repo, run `pnpm install`, open Claude Code in the folder, and run `/setup`.
 
+## Development
+pnpm workspaces: `packages/core`, `packages/resume`, `apps/dashboard`. Node 22 and pnpm 12.
+
+```
+pnpm install
+pnpm typecheck     # tsc -b across every workspace
+pnpm lint          # ESLint (flat config, typescript-eslint)
+pnpm format:check  # Prettier, code files only
+pnpm test          # Vitest, including the .gitignore guard in tests/
+pnpm check         # all of the above, same as CI
+pnpm jh            # the CLI (commands land in M1 task 6)
+```
+
+CI runs the same four checks on every push and pull request (`.github/workflows/ci.yml`).
+
 ## Status
 Work in progress. See `docs/SPEC.md` and `docs/TASKS.md`.
 
