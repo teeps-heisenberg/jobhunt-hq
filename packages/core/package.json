@@ -14,19 +14,26 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "drizzle"
   ],
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -b",
     "test": "vitest run --root ../.. packages/core",
-    "jh": "tsx src/cli.ts"
+    "jh": "tsx src/cli.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:check": "drizzle-kit check"
   },
   "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "drizzle-orm": "^0.45.4",
     "yaml": "^2.9.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@types/node": "^26.6.5"
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26.6.5",
+    "drizzle-kit": "^0.31.11"
   }
 }

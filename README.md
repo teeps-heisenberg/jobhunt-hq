@@ -43,6 +43,9 @@ CI runs the same four checks on every push and pull request (`.github/workflows/
 ### Core package
 `packages/core/src/schema.ts` holds the zod schemas for every boundary: `JobInput` (what a job-scout returns and `jh add-jobs` accepts), `Job`, `JobStatus`, `Artifact`, `Event`, `SearchRun`, `Profile` and `Rules`. `loadConfig()` in `config.ts` reads `config/profile.yaml` and `config/rules.yaml`, fills defaults, and throws a `ConfigError` that names the file and every invalid field. The example files in `config/` are validated in tests.
 
+### Tracker database
+SQLite via Drizzle and better-sqlite3, at `data/jobhunt.db` (override with `JH_DB`). `openDb()` in `packages/core/src/db/client.ts` creates the file and applies the SQL migrations in `packages/core/drizzle/` on every open. Tables: `jobs`, `artifacts`, `events` (the audit trail), `searches`. Repository functions in `db/repo.ts` (`insertJobs`, `listJobs`, `setStatus`, `addNote`, `addArtifact`, `recordSearch`, `getStats`) validate every row with zod on the way out. After changing `db/tables.ts`, run `pnpm --filter @jobhunt-hq/core db:generate` and commit the new migration.
+
 ## Status
 Work in progress. See `docs/SPEC.md` and `docs/TASKS.md`.
 

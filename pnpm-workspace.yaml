@@ -5,3 +5,4 @@ packages:
 # Only these dependencies may run install scripts (pnpm asks otherwise).
 allowBuilds:
   esbuild: true
+  better-sqlite3: true
