@@ -1,111 +1,142 @@
 # JobHunt HQ
 
-**An open-source, Claude Code native job-search kit.** Describe yourself once. Claude Code finds roles you can realistically get, scores them honestly, tailors a truthful two-page CV and note for each, helps fill application forms (without ever submitting), and tracks everything in a local dashboard.
+**An open-source, Claude Code native job-search kit.** Describe yourself once. Claude Code finds roles you can realistically get, scores them honestly, tailors a truthful two-page CV and cover note for each, helps fill application forms without ever submitting, and tracks everything in a local dashboard.
 
-> Built from a real three-week test run: 509 roles tracked across 378 companies, 132 tailored CVs, 53 applications, 8 responses.
+![The tracker table: score, status, company, role, location, follow-up date, why it fits and the main gap](docs/images/dashboard-table.jpg)
+
+> Built from a real three-week test run: 509 roles tracked across 378 companies, 132 tailored CVs, 53 applications, 8 responses. This repo turns that workflow into something anyone can run with their own preferences.
 
 ## Why
-Most job tools match keywords. JobHunt HQ filters for what actually blocks you (visa, location, years bar, language) and tells you the gap before you spend an hour on an application.
+Most job tools match keywords. JobHunt HQ filters for what actually blocks you (visa, location, years bar, language, clearance) and tells you the gap before you spend an hour on an application. Everything it writes comes from your own master CV, and every sentence it cannot trace back is listed for you to verify.
+
+## Quick start
+You need Node 22, pnpm 12, [Claude Code](https://claude.com/claude-code), and LibreOffice for PDF rendering (the kit tells you when it is missing).
+
+```bash
+git clone https://github.com/teeps-heisenberg/jobhunt-hq.git
+cd jobhunt-hq
+pnpm install
+pnpm jh doctor      # what is set up, what is missing
+```
+
+Then open Claude Code in the folder and run the skills in order:
+
+| Step | Skill | What happens |
+|---|---|---|
+| 1 | `/setup` | Imports your CV (DOCX or PDF), interviews you, writes `config/profile.yaml`, `config/rules.yaml` and `data/master.json`, validates them. |
+| 2 | `/search [focus]` | One scout agent per source group searches official careers pages and public ATS boards in parallel. The CLI dedupes, scores and stores the rows. |
+| 3 | `/score <id or URL>` | Scores one posting against your rules: hard blockers first, then a 0 to 5 number with why and gap. |
+| 4 | `/tailor <id>` | Builds a variant of your master CV for the role, renders DOCX and PDF, checks the page count and style, flags every new claim. |
+| 5 | `/pack <id>` | Writes `output/<company>/<role>/pack.md`: cover note, why this role, screening answers from your rules, and the verify list. |
+| 6 | `/apply <id>` | Opens the form in a browser, fills the fields it knows, and stops. You attach files, tick boxes and submit. |
+| 7 | `/followups` | Lists due follow-ups and drafts short messages. You send them. |
+
+Meanwhile `pnpm dev` runs the dashboard on http://localhost:3000. Just looking? `pnpm demo` starts it on a throwaway database filled with fictional data.
+
+![The kanban board: drag a card to change its status](docs/images/dashboard-board.jpg)
 
 ## How it works
 ```
-/setup  →  profile.yaml + rules.yaml + master.json
-/search →  parallel job-scout agents → dedupe → score → tracker (SQLite)
-/tailor →  variant from master.json → DOCX + PDF → page check → claim check → pack.md
-/apply  →  Playwright fills the form → stops before Submit → you review and submit
-dashboard (localhost:3000) → table, kanban, follow-ups, stats
+Claude Code (your terminal)
+  ├─ .claude/skills/*      the workflows: setup, search, score, tailor, pack, apply, followups
+  ├─ .claude/agents/*      subagents: job-scout (one per source group), claim-checker
+  ├─ Playwright MCP        fills application forms, never submits
+  └─ pnpm jh <command>     everything that must be exact and repeatable
+        ├─ packages/core    zod schemas, scoring, dedupe, SQLite tracker (Drizzle), the CLI
+        ├─ packages/resume  master CV schema, variant builder, DOCX, PDF, page check, style lint
+        └─ apps/dashboard   Next.js on the same SQLite file: table, kanban, job pages, stats
+
+config/   profile.yaml, rules.yaml     your preferences (git-ignored; *.example.yaml committed)
+data/     master.json, jobhunt.db      your CV and tracker (git-ignored)
+output/   <company>/<role>/            cv.docx, cv.pdf, cover.docx, pack.md (git-ignored)
 ```
+
+The split is deliberate. The language model does judgment: reading postings, writing why and gap lines, choosing which bullets to lead with. The TypeScript CLI does everything that must be exact: validation, dedupe, the score, database writes, rendering, page counts, the style lint. Skills call the CLI; they never hand-edit the database or make up a number.
 
 ## Safety principles
-- **You submit.** It never clicks Submit, ticks consent boxes, or types passwords or IDs.
-- **No invented claims.** Every new sentence is listed for you to verify.
-- **Local first.** Your profile, CVs and tracker never leave your machine.
-- **Plays fair.** Official careers pages and public ATS boards only. No login-walled scraping, no CAPTCHA solving, no LinkedIn automation.
+- **You submit.** The kit never clicks Submit, Send or Apply, never ticks consent or terms boxes, never types passwords, national IDs, dates of birth or payment details. A Playwright test against Greenhouse, Lever and Ashby style forms proves the filler never submits.
+- **No invented claims.** CVs and notes are generated only from `data/master.json` and `config/profile.yaml`. Anything new is listed under "Verify before sending", and a claim-checker agent reviews every sentence.
+- **Local first.** Your profile, CV, tracker and generated files stay on your machine. A test asserts they are git-ignored.
+- **Plays fair.** Official careers pages and public ATS boards only. No login-walled scraping, no CAPTCHA solving, no LinkedIn automation, no bulk auto-apply. A daily application cap lives in your rules.
+- **Respects employers' AI rules.** If a posting says not to use AI for answers, the kit says so and does not write them.
 
-## Quick start
-_Coming in v0.1.0._ Clone the repo, run `pnpm install`, open Claude Code in the folder, and run `/setup`.
+## Configuration reference
+All three files are yours and git-ignored. Start from the examples in `config/` and `data/examples/`; `pnpm jh doctor` validates them.
 
-## Development
-pnpm workspaces: `packages/core`, `packages/resume`, `apps/dashboard`. Node 22 and pnpm 12.
+### `config/profile.yaml`
+| Field | Meaning |
+|---|---|
+| `name`, `contact.email`, `contact.phone`, `contact.location`, `contact.links` | As they should appear on applications. |
+| `citizenship` | Countries or blocs (`EU`) where you can work without sponsorship. |
+| `yearsExperience` | The number you would give on a screening form. |
+| `languages` | `{name, level}` with level `basic`, `conversational`, `professional`, `fluent` or `native`. |
+| `targetTitles` | Three to six titles the scouts search for. |
+| `noticePeriod`, `currentSalary`, `targetSalary` | Used in screening answers. Optional. |
+| `neverClaim` | Things you do not want claimed even if a posting asks for them. |
+
+### `config/rules.yaml`
+| Field | Meaning |
+|---|---|
+| `locations.remoteFrom` | Where you can take remote roles (countries or `EU`). |
+| `locations.relocate` | Cities you would move to. |
+| `locations.exclude` | Never, for example where a visa is unrealistic. |
+| `visa.needsSponsorshipOutside` | Blocs where you do not need sponsorship, for example `[EU]`. |
+| `visa.skipIf` | Phrases that mark a hard blocker, such as `citizenship required`. |
+| `experience.maxYearsBar` | Skip roles asking for more years than this. |
+| `hardBlockers.languagesRequired` | Languages that block a role when fluency is required and your profile lists you below professional. |
+| `recencyDays` | Ignore postings older than this. |
+| `salary` | Bands per location key (`remote`, a city or a country), free text such as `EUR 50-60K`. Used for the salary factor and screening answers, always with "flexible". |
+| `style.maxPages`, `style.bannedCharacters`, `style.bannedPhrases`, `style.projectOrder` | CV page target (exact), banned characters (the em dash by default) and phrases, default project order. |
+| `caps.dailyApplications`, `caps.<company>` | Application caps, for example `google: {applications: 3, perDays: 30}`. |
+| `sources` | `bigTech`, `ats` (board names), `remote` (sites), `research`, `custom` (your boards). |
+| `scoring.weights`, `scoring.shortlistAt` | Factor weights (must add up to 1) and the score at which a job is suggested as Shortlisted. |
+| `followUpDays` | Days after applying before a follow-up is due. |
+
+### `data/master.json`
+Your master CV: `name`, `title`, `contact` lines, `summary` (plus optional `summaries` keyed alternatives), `skills` as `[group, "a, b, c"]` pairs, `experience` with bullets, `projects`, `education`, `certifications`, `additional`. See `data/examples/master.json` and the schema in `packages/resume/src/schema.ts`. Every tailored CV is a reordering or re-phrasing of this file; nothing is added without being flagged.
+
+## The CLI
+Skills call these; you can too.
 
 ```
-pnpm install
-pnpm typecheck     # tsc -b across every workspace
-pnpm lint          # ESLint (flat config, typescript-eslint)
-pnpm format:check  # Prettier, code files only
-pnpm test          # Vitest, including the .gitignore guard in tests/
-pnpm check         # all of the above, same as CI
-pnpm dev           # dashboard on http://localhost:3000 (builds packages/core first)
-pnpm demo          # dashboard on a throwaway database seeded from data/examples
-pnpm jh            # the CLI, see below
-```
-
-CI runs the same four checks on every push and pull request (`.github/workflows/ci.yml`).
-
-### Core package
-`packages/core/src/schema.ts` holds the zod schemas for every boundary: `JobInput` (what a job-scout returns and `jh add-jobs` accepts), `Job`, `JobStatus`, `Artifact`, `Event`, `SearchRun`, `Profile` and `Rules`. `loadConfig()` in `config.ts` reads `config/profile.yaml` and `config/rules.yaml`, fills defaults, and throws a `ConfigError` that names the file and every invalid field. The example files in `config/` are validated in tests.
-
-### Tracker database
-SQLite via Drizzle and better-sqlite3, at `data/jobhunt.db` (override with `JH_DB`). `openDb()` in `packages/core/src/db/client.ts` creates the file and applies the SQL migrations in `packages/core/drizzle/` on every open. Tables: `jobs`, `artifacts`, `events` (the audit trail), `searches`. Repository functions in `db/repo.ts` (`insertJobs`, `listJobs`, `setStatus`, `addNote`, `addArtifact`, `recordSearch`, `getStats`) validate every row with zod on the way out. After changing `db/tables.ts`, run `pnpm --filter @jobhunt-hq/core db:generate` and commit the new migration.
-
-### Dedupe
-`packages/core/src/dedupe.ts` decides whether a scouted posting is already tracked, strongest evidence first: the same ATS job id (Greenhouse, Lever, Ashby, Workable, Workday, SmartRecruiters), the same normalised URL, the same normalised company + title + location, then a fuzzy title match at the same company and location (reposts with small wording changes). Seniority words never merge. The same title at the same company in another location is reported as a regional variant, not dropped. `makeJobId()` builds the `company-title-city` slug used as the tracker id.
-
-### Scoring
-`packages/core/src/scoring.ts` computes the number; the LLM writes the why and gap text. `findBlockers()` returns a reason for each hard blocker (years above `rules.experience.maxYearsBar`, excluded location, security clearance, citizenship or work authorisation the user lacks, a required language below professional level); any blocker means `Skipped` with score 0. Otherwise five factors (skills overlap with the master CV, years fit, location and visa, recency, salary against `rules.salary`) are weighted by `rules.scoring.weights` into a 0 to 5 score, and `rules.scoring.shortlistAt` (default 4) decides between `Shortlisted` and `New`. Every factor carries a one-line note so the dashboard can explain the number.
-
-### CLI (`pnpm jh`)
-Skills call these; nothing else writes to the database.
-
-```
-pnpm jh add-jobs <file.json> [--focus text] [--dry-run] [--json]
-pnpm jh list [--status S]... [--min-score N] [--company C] [--source S] [--batch B] [--due] [--limit N] [--format table|json|ids]
-pnpm jh set-status <id> <status> [--note text] [--follow-up YYYY-MM-DD]
+pnpm jh doctor                      validate config, master, database and LibreOffice
+pnpm jh import-cv <file>            CV text for /setup
+pnpm jh sources                     source groups for /search
+pnpm jh scout-brief <group>         the brief one scout reads
+pnpm jh add-jobs <file.json>        validate, dedupe, score and insert scouted rows
+pnpm jh list [filters]              table, json or ids
+pnpm jh show <id>                   one job with timeline and artifacts
+pnpm jh score <id> --from file.json store why and gap, re-run the engine
+pnpm jh tailor <id> --variant spec  DOCX, PDF, page check, style lint, verify list
+pnpm jh pack <id> --from pack.json  pack.md and cover.docx
+pnpm jh apply-plan <id>             fields the browser may fill, and what is left for you
+pnpm jh set-status <id> <status>    with --note and --follow-up
 pnpm jh note <id> <text>
-pnpm jh score <id> [--from file.json] [--why text] [--gap text] [--visa-note text] [--min-years N] [--requirements "a, b"]
-pnpm jh show <id> [--json]
-pnpm jh tailor <id|generic> [--variant spec.json] [--no-pdf] [--json]
-pnpm jh pack <id> --from pack.json [--json]
-pnpm jh stats [--json]
-pnpm jh export-csv [file]
-pnpm jh import-cv <file.docx|.pdf|.txt> [--out file.txt]
-pnpm jh doctor [--json]
-pnpm jh sources [--json]
-pnpm jh scout-brief <group> [--focus text] [--out file]
+pnpm jh followups [--days N]        due follow-ups
+pnpm jh followup-sent <id>          record one and set the next date
+pnpm jh stats, export-csv [file]
 ```
+Global options: `--db <path>` (or `JH_DB`), `--config-dir <dir>`, `--master <file>`, `--json`.
 
-`add-jobs` accepts a JSON array of scout rows or `{jobs, rejected}`, validates them against `JobInput`, dedupes against the tracker and within the batch, scores each new row with the rules and `data/master.json`, and records a search run. Moving a job to `Applied` sets the follow-up date from `rules.followUpDays` unless `--follow-up` is given. Global options: `--db <path>` (or `JH_DB`), `--config-dir <dir>`, `--master <file>`.
+## FAQ
+**Does it apply for me?** No, and it never will. It fills the fields it knows from your profile and pack, then stops. You attach files, read the consent boxes, and click Submit. Auto-apply gets people blacklisted and wastes everyone's time.
 
-### Resume package
-`packages/resume` turns `data/master.json` into a tailored CV without inventing anything:
-- `Master` (zod) is the master CV schema; `data/examples/master.json` is a fictional example.
-- `buildVariant(master, spec)` applies a `VariantSpec` (title, summary by key or text, skill order and overrides, project order and cap, bullets per position) and returns the resume plus `newClaims`: every piece of text that is not in the master, for the "Verify before sending" list.
-- `renderDocx(resume)` is the prototype `scripts/resume/build-docx.js` ported to TypeScript (Letter, Arial, navy headings).
-- `convertToPdf(docx)` runs `soffice --headless --convert-to pdf`. It needs LibreOffice: install it or set `SOFFICE` to the binary. `checkPages(pdf, rules.style.maxPages)` counts pages with pdf-lib and insists on the exact count.
-- `lintText(text, { bannedCharacters, bannedPhrases })` flags em dashes by default plus anything from `rules.style`, with line and column.
-- `renderCoverLetterDocx(letter)` and `renderDocumentDocx(doc)` are the other two prototype renderers ported: a one-page cover letter and a generic title, sections, bullets and key-value document. `documentToMarkdown` renders the same document as Markdown.
-- `renderPackMarkdown(pack)` is the `pack.md` template (SPEC F6): posting links and file paths, posting rules to read first, the cover note, why this role, screening answers with their source, and the "Verify before sending" list. `packFolder(company, role)` gives `output/<company>/<role>`.
+**Will it make my CV sound better than I am?** It only reorders, selects and re-phrases what is in your master CV. If a sentence is new, it appears under "Verify before sending" and you decide. The claim-checker agent is deliberately strict: "led" is not "used", and a number must match exactly.
 
-### Setup skill (`/setup`)
-`.claude/skills/setup-profile/SKILL.md` walks a new user from an existing CV to validated config: `pnpm jh import-cv <cv>` extracts the text (DOCX via the zip, PDF via pdf.js) into `data/imports/`, Claude drafts `data/master.json` from it without embellishing, interviews for what the CV does not hold, writes `config/profile.yaml` and `config/rules.yaml` from the examples, and `pnpm jh doctor` validates all three files, opens the database and checks for LibreOffice.
+**Why is a role Skipped with a score of 0?** A hard blocker: citizenship or clearance you do not have, a required language below your level, more years than your bar, or an excluded location. The reason is stored in the job's gap text. Blockers are not low scores; they are a no.
 
-### Search skill (`/search`)
-`.claude/skills/job-search/SKILL.md` fans out one `job-scout` subagent per source group. `pnpm jh sources` lists the groups (`bigTech`, `ats`, `remote`, `research`, `custom`) with their enabled state from `rules.sources`; `pnpm jh scout-brief <group>` writes `data/scout/<group>.md`, the brief every scout reads: where to look, the candidate summary, the rules in priority order with the recency cut-off date, every tracked role to skip, and the exact JSON output shape. Scouts return JSON only; `pnpm jh add-jobs` validates, dedupes, scores and stores it.
+**Can I change a score?** Not by hand. Fix the inputs (`pnpm jh score <id> --from ...` with the posting's requirements) or your rules (weights, salary bands, years bar), then re-run. That keeps scores comparable.
 
-### Score skill (`/score`)
-`.claude/skills/score-job/SKILL.md` adds a pasted URL through `jh add-jobs` when needed, reads the posting against the rules with the hard blockers first, writes `data/scout/<id>.score.json` (why, gap, visa note, the posting's must-haves as it names them, minimum years, salary, posting date) and runs `pnpm jh score <id> --from <that file>`. The engine computes the number and suggests the status; the skill never sets a score by hand, and a disputed number is fixed by correcting the inputs or the rules.
+**Where is my data?** In `config/`, `data/` and `output/` on your machine. They are git-ignored and a test checks that they stay so. Nothing is uploaded anywhere except what you send to employers yourself.
 
-### Tailor skill (`/tailor`) and claim checker
-`.claude/skills/tailor-resume/SKILL.md` writes a `VariantSpec` (title, summary, skill order and overrides, project order and cap, at most three re-phrased bullets) and runs `pnpm jh tailor <id> --variant <spec>`. The command renders `output/<company>/<role>/cv.docx` and `cv.pdf`, checks the exact page count against `rules.style.maxPages`, runs the style lint, records both files as artifacts, and prints every piece of text that is not in `data/master.json` as "verify before sending". It exits non-zero until pages and lint pass. The `claim-checker` subagent (`.claude/agents/claim-checker.md`) then classifies every sentence as supported, rephrased or new, and the two lists are merged into the pack's verify section. `pnpm jh tailor generic` renders the untailored master for a layout check.
+**The PDF step says LibreOffice is missing.** Install LibreOffice or point `SOFFICE` at the binary. DOCX rendering, the page count on existing PDFs and everything else keep working.
 
-### Pack skill (`/pack`)
-`.claude/skills/pack/SKILL.md` writes `data/scout/<id>.pack.json` (cover note paragraphs, why this role, extra screening answers, posting notes, verify items) and runs `pnpm jh pack <id> --from <that file>`. The command adds the standard screening answers from the rules (years from the profile, the `rules.salary` band for the job's location with "flexible", notice period, work authorisation), merges the verify items the tailored CV already carries, renders `output/<company>/<role>/pack.md` and `cover.docx`, lints the text, and records both as artifacts.
+**A job site stopped working.** Open a "Job source problem" issue with the board URL and what the scout reported. Sources are pluggable; ATS JSON endpoints are preferred because they change least.
 
-### Dashboard
-`apps/dashboard` is a Next.js 15 app (App Router, Tailwind 4) on the same SQLite file as the CLI, read and written only through `@jobhunt-hq/core`. Pages: a table with filters (search, status, min score, region, remote, batch, found since), a kanban board where dragging a card changes the status and records the event, a job page with posting links, why and gap, artifacts and their verify items, the timeline, and forms for status, follow-up date and notes, and a stats page with the funnel and responses by source. `pnpm dev` starts it on your tracker; `pnpm demo` seeds `data/demo/jobhunt.db` from the fictional `data/examples/jobs.json` and starts it there, without touching your data. Set `JH_DB` to point the dashboard at another file.
+**Which models or tools does it need?** Claude Code with its built-in subagents, plus the Playwright MCP for `/apply`. No API keys of your own.
 
-## Status
-Work in progress. See `docs/SPEC.md` and `docs/TASKS.md`.
+## Contributing
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the ground rules (the human submits, no invented claims, local first), the setup, and how to propose changes. Development notes per package are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md); the product spec is [docs/SPEC.md](docs/SPEC.md) and the build plan is [docs/TASKS.md](docs/TASKS.md). This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md).
 
 ## License
 MIT
