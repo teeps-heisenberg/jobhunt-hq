@@ -18,7 +18,7 @@ You are working in an open-source job-search kit. There are two kinds of work he
 packages/core      zod schemas, scoring, dedupe, Drizzle + SQLite tracker, CLI (pnpm jh)
 packages/resume    master.json schema, variant builder, DOCX render, PDF via LibreOffice, page check, style lint
 apps/dashboard     Next.js 15 + Tailwind dashboard on the same SQLite DB
-.claude/skills     workflows: setup-profile, job-search, score-job, tailor-resume, apply-assist, follow-ups
+.claude/skills     workflows: setup-profile, job-search, score-job, tailor-resume, pack, apply-assist, follow-ups
 .claude/agents     subagents: job-scout, claim-checker
 config/            *.example.yaml committed; user copies are ignored
 data/examples      a fictional master.json for tests and demos
