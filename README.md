@@ -74,6 +74,8 @@ pnpm jh export-csv [file]
 - `renderDocx(resume)` is the prototype `scripts/resume/build-docx.js` ported to TypeScript (Letter, Arial, navy headings).
 - `convertToPdf(docx)` runs `soffice --headless --convert-to pdf`. It needs LibreOffice: install it or set `SOFFICE` to the binary. `checkPages(pdf, rules.style.maxPages)` counts pages with pdf-lib and insists on the exact count.
 - `lintText(text, { bannedCharacters, bannedPhrases })` flags em dashes by default plus anything from `rules.style`, with line and column.
+- `renderCoverLetterDocx(letter)` and `renderDocumentDocx(doc)` are the other two prototype renderers ported: a one-page cover letter and a generic title, sections, bullets and key-value document. `documentToMarkdown` renders the same document as Markdown.
+- `renderPackMarkdown(pack)` is the `pack.md` template (SPEC F6): posting links and file paths, posting rules to read first, the cover note, why this role, screening answers with their source, and the "Verify before sending" list. `packFolder(company, role)` gives `output/<company>/<role>`.
 
 ## Status
 Work in progress. See `docs/SPEC.md` and `docs/TASKS.md`.

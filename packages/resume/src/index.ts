@@ -8,5 +8,8 @@ export * from './variant.js';
 export * from './docx.js';
 export * from './pdf.js';
 export * from './lint.js';
+export * from './cover.js';
+export * from './document.js';
+export * from './pack.js';
 
 export const PACKAGE_NAME = '@jobhunt-hq/resume';
