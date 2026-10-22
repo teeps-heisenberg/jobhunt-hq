@@ -3,16 +3,30 @@
  * `run()` is pure with respect to process state so tests can drive it with a temp database.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { basename, dirname, extname, join, resolve } from 'node:path';
+import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { z } from 'zod';
 
-import { findSoffice, importCv, Master } from '@jobhunt-hq/resume';
+import {
+  buildVariant,
+  checkPages,
+  convertToPdf,
+  findSoffice,
+  formatIssue,
+  importCv,
+  lintText,
+  Master,
+  packFolder,
+  type PageCheck,
+  resumeToText,
+  writeDocx,
+} from '@jobhunt-hq/resume';
 
 import { ConfigError, loadConfig, loadProfile, loadRules } from '../config.js';
 import { openDb, type Tracker } from '../db/client.js';
 import {
+  addArtifact,
   addNote,
   getJob,
   getStats,
@@ -62,6 +76,8 @@ Commands
   score <id>                 store why/gap text and re-score (--from file.json, or --why,
                              --gap, --visa-note, --min-years, --requirements "a, b")
   show <id>                  one job with its events and artifacts
+  tailor <id|generic>        render the CV for a job: DOCX, PDF, page check, style lint
+                             (--variant spec.json, --no-pdf)
   stats                      funnel and follow-ups due
   export-csv [file]          export every job as CSV (stdout when no file)
   import-cv <file>           extract text from a DOCX, PDF or TXT CV into data/imports/
@@ -74,6 +90,7 @@ Global options
   --config-dir <dir>         profile.yaml and rules.yaml (default: config)
   --master <file>            master CV for skills matching (default: data/master.json)
   --dry-run                  add-jobs: report without writing
+  --no-pdf                   tailor: skip the LibreOffice PDF step
   --json                     machine-readable output
   -h, --help                 this text
 
@@ -106,6 +123,8 @@ const GLOBAL_OPTIONS = {
   requirements: { type: 'string' },
   out: { type: 'string' },
   from: { type: 'string' },
+  variant: { type: 'string' },
+  'no-pdf': { type: 'boolean', default: false },
 } as const;
 
 class CliError extends Error {
@@ -196,6 +215,7 @@ const COMMANDS: Record<string, Handler> = {
   note,
   score,
   show,
+  tailor,
   stats,
   'export-csv': exportCsv,
   'import-cv': importCvCmd,
@@ -868,4 +888,125 @@ function scoutBriefCmd(ctx: Ctx): void {
     return;
   }
   ctx.io.out(out);
+}
+
+// ---------------------------------------------------------------------------
+// tailor
+// ---------------------------------------------------------------------------
+
+async function tailor(ctx: Ctx): Promise<void> {
+  const [target] = ctx.positionals;
+  if (!target) {
+    throw new CliError(
+      'Usage: jh tailor <id|generic> [--variant spec.json] [--no-pdf] [--json]',
+      2,
+    );
+  }
+  const { rules } = loadRulesAndProfile(ctx);
+  const masterPath = resolve(ctx.cwd, ctx.values.master ?? 'data/master.json');
+  if (!existsSync(masterPath)) {
+    throw new CliError(`${masterPath}: not found. Run /setup to draft it from your CV.`, 1);
+  }
+  const master = JSON.parse(readFileSync(masterPath, 'utf8')) as unknown;
+
+  let spec: unknown = {};
+  if (ctx.values.variant) {
+    const path = resolve(ctx.cwd, ctx.values.variant);
+    if (!existsSync(path)) throw new CliError(`File not found: ${path}`, 2);
+    spec = JSON.parse(readFileSync(path, 'utf8'));
+  }
+
+  const job = target === 'generic' ? undefined : requireJob(ctx, target);
+  const folder = resolve(
+    ctx.cwd,
+    job ? packFolder(job.company, job.role) : join('output', 'generic'),
+  );
+  mkdirSync(folder, { recursive: true });
+
+  let variant;
+  try {
+    variant = buildVariant(master, spec);
+  } catch (error) {
+    throw new CliError(
+      `Variant could not be built: ${error instanceof Error ? error.message : String(error)}`,
+      2,
+    );
+  }
+  const { resume, newClaims } = variant;
+
+  const docxPath = await writeDocx(resume, join(folder, 'cv.docx'));
+  const style = rules.style;
+  const lintIssues = lintText(resumeToText(resume), {
+    bannedCharacters: style.bannedCharacters,
+    bannedPhrases: style.bannedPhrases,
+  });
+
+  let pdfPath: string | undefined;
+  let pages: PageCheck | undefined;
+  let pdfNote: string | undefined;
+  if (ctx.values['no-pdf']) {
+    pdfNote = 'skipped (--no-pdf)';
+  } else if (!findSoffice()) {
+    pdfNote = 'skipped: LibreOffice (soffice) not found; install it or set SOFFICE';
+  } else {
+    pdfPath = await convertToPdf(docxPath);
+    pages = await checkPages(pdfPath, style.maxPages);
+  }
+
+  const verifyItems = newClaims.map((c) => `${c.where}: ${c.text}`);
+  const at = nowIso(ctx.today);
+  if (job) {
+    const { db } = ctx.tracker();
+    addArtifact(
+      db,
+      { jobId: job.id, kind: 'cv_docx', path: rel(ctx.cwd, docxPath), verifyItems },
+      at,
+    );
+    if (pdfPath) {
+      addArtifact(
+        db,
+        { jobId: job.id, kind: 'cv_pdf', path: rel(ctx.cwd, pdfPath), verifyItems },
+        at,
+      );
+    }
+  }
+
+  const ok = lintIssues.length === 0 && (pages?.ok ?? true);
+  const summary = {
+    job: job?.id ?? 'generic',
+    folder: rel(ctx.cwd, folder),
+    docx: rel(ctx.cwd, docxPath),
+    pdf: pdfPath ? rel(ctx.cwd, pdfPath) : null,
+    pdfNote: pdfNote ?? null,
+    pages: pages ?? null,
+    lint: lintIssues.map(formatIssue),
+    newClaims,
+    ok,
+  };
+
+  if (ctx.values.json) {
+    ctx.io.out(JSON.stringify(summary, null, 2));
+  } else {
+    ctx.io.out(`${summary.job}: ${ok ? 'OK' : 'NEEDS WORK'}`);
+    ctx.io.out(`  docx   ${summary.docx}`);
+    ctx.io.out(`  pdf    ${summary.pdf ?? pdfNote ?? ''}`);
+    if (pages) ctx.io.out(`  pages  ${pages.message}`);
+    ctx.io.out(
+      lintIssues.length
+        ? `  lint   ${lintIssues.length} issue${lintIssues.length === 1 ? '' : 's'}`
+        : '  lint   clean',
+    );
+    for (const issue of lintIssues) ctx.io.out(`    ${formatIssue(issue)}`);
+    if (newClaims.length) {
+      ctx.io.out(`  verify before sending (${newClaims.length}, not in master.json):`);
+      for (const c of newClaims) ctx.io.out(`    - ${c.where}: ${c.text}`);
+    } else {
+      ctx.io.out('  verify before sending: nothing, every sentence is in master.json');
+    }
+  }
+  if (!ok) throw new CliError(pages && !pages.ok ? pages.message : 'style lint failed', 1);
+}
+
+function rel(cwd: string, path: string): string {
+  return relative(cwd, path).split('\\').join('/');
 }

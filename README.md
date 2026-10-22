@@ -62,6 +62,7 @@ pnpm jh set-status <id> <status> [--note text] [--follow-up YYYY-MM-DD]
 pnpm jh note <id> <text>
 pnpm jh score <id> [--from file.json] [--why text] [--gap text] [--visa-note text] [--min-years N] [--requirements "a, b"]
 pnpm jh show <id> [--json]
+pnpm jh tailor <id|generic> [--variant spec.json] [--no-pdf] [--json]
 pnpm jh stats [--json]
 pnpm jh export-csv [file]
 pnpm jh import-cv <file.docx|.pdf|.txt> [--out file.txt]
@@ -90,6 +91,9 @@ pnpm jh scout-brief <group> [--focus text] [--out file]
 
 ### Score skill (`/score`)
 `.claude/skills/score-job/SKILL.md` adds a pasted URL through `jh add-jobs` when needed, reads the posting against the rules with the hard blockers first, writes `data/scout/<id>.score.json` (why, gap, visa note, the posting's must-haves as it names them, minimum years, salary, posting date) and runs `pnpm jh score <id> --from <that file>`. The engine computes the number and suggests the status; the skill never sets a score by hand, and a disputed number is fixed by correcting the inputs or the rules.
+
+### Tailor skill (`/tailor`) and claim checker
+`.claude/skills/tailor-resume/SKILL.md` writes a `VariantSpec` (title, summary, skill order and overrides, project order and cap, at most three re-phrased bullets) and runs `pnpm jh tailor <id> --variant <spec>`. The command renders `output/<company>/<role>/cv.docx` and `cv.pdf`, checks the exact page count against `rules.style.maxPages`, runs the style lint, records both files as artifacts, and prints every piece of text that is not in `data/master.json` as "verify before sending". It exits non-zero until pages and lint pass. The `claim-checker` subagent (`.claude/agents/claim-checker.md`) then classifies every sentence as supported, rephrased or new, and the two lists are merged into the pack's verify section. `pnpm jh tailor generic` renders the untailored master for a layout check.
 
 ## Status
 Work in progress. See `docs/SPEC.md` and `docs/TASKS.md`.

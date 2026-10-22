@@ -1,4 +1,11 @@
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -504,4 +511,100 @@ describe('sources and scout-brief', () => {
     expect(err.at(-1)).toMatch(/Groups: bigTech, ats, remote, research, custom/);
     expect(await jh('scout-brief')).toBe(2);
   });
+});
+
+describe('tailor', () => {
+  beforeEach(async () => {
+    await jh('add-jobs', writeScout('one.json', [scoutRows[0]]));
+    out = [];
+    err = [];
+  });
+
+  it('renders the master CV for a job, records artifacts and reports no claims', async () => {
+    expect(await jh('tailor', 'acme-full-stack-engineer-eu', '--no-pdf')).toBe(0);
+    const text = out.join('\n');
+    expect(text).toContain('acme-full-stack-engineer-eu: OK');
+    expect(text).toContain('docx   output/acme/full-stack-engineer/cv.docx');
+    expect(text).toContain('pdf    skipped (--no-pdf)');
+    expect(text).toContain('lint   clean');
+    expect(text).toContain('verify before sending: nothing');
+    expect(existsSync(join(cwd, 'output/acme/full-stack-engineer/cv.docx'))).toBe(true);
+
+    out = [];
+    await jh('show', 'acme-full-stack-engineer-eu', '--json');
+    const { artifacts } = JSON.parse(out.join('\n'));
+    expect(artifacts).toMatchObject([
+      { kind: 'cv_docx', path: 'output/acme/full-stack-engineer/cv.docx', verifyItems: [] },
+    ]);
+  });
+
+  it('applies a variant spec and lists new claims as verify items', async () => {
+    writeFileSync(
+      join(cwd, 'spec.json'),
+      JSON.stringify({
+        title: 'Full Stack Engineer, Applied AI',
+        skills: { order: ['AI / ML'] },
+        experience: [{ company: 'Example Agency', bullets: ['Led a team of four engineers.'] }],
+      }),
+    );
+    expect(
+      await jh(
+        'tailor',
+        'acme-full-stack-engineer-eu',
+        '--variant',
+        'spec.json',
+        '--no-pdf',
+        '--json',
+      ),
+    ).toBe(0);
+    const summary = JSON.parse(out.join('\n'));
+    expect(summary.ok).toBe(true);
+    expect(summary.newClaims).toEqual([
+      { where: 'title', text: 'Full Stack Engineer, Applied AI' },
+      { where: 'experience.Example Agency', text: 'Led a team of four engineers.' },
+    ]);
+    out = [];
+    await jh('show', 'acme-full-stack-engineer-eu', '--json');
+    const { artifacts } = JSON.parse(out.join('\n'));
+    expect(artifacts[0].verifyItems).toEqual([
+      'title: Full Stack Engineer, Applied AI',
+      'experience.Example Agency: Led a team of four engineers.',
+    ]);
+  });
+
+  it('fails the style lint on a banned character but still writes the file', async () => {
+    writeFileSync(join(cwd, 'spec.json'), JSON.stringify({ summary: 'Builder — of things.' }));
+    expect(
+      await jh('tailor', 'acme-full-stack-engineer-eu', '--variant', 'spec.json', '--no-pdf'),
+    ).toBe(1);
+    expect(out.join('\n')).toMatch(/NEEDS WORK[\s\S]*lint {3}1 issue[\s\S]*em dash/);
+    expect(err.at(-1)).toBe('style lint failed');
+    expect(existsSync(join(cwd, 'output/acme/full-stack-engineer/cv.docx'))).toBe(true);
+  });
+
+  it('renders a generic CV without a job and rejects bad input', async () => {
+    expect(await jh('tailor', 'generic', '--no-pdf')).toBe(0);
+    expect(out[0]).toBe('generic: OK');
+    expect(existsSync(join(cwd, 'output/generic/cv.docx'))).toBe(true);
+
+    expect(await jh('tailor')).toBe(2);
+    expect(await jh('tailor', 'missing', '--no-pdf')).toBe(1);
+    expect(await jh('tailor', 'generic', '--variant', 'none.json', '--no-pdf')).toBe(2);
+    writeFileSync(join(cwd, 'bad.json'), JSON.stringify({ projects: { max: -1 } }));
+    expect(await jh('tailor', 'generic', '--variant', 'bad.json', '--no-pdf')).toBe(2);
+    expect(err.at(-1)).toMatch(/Variant could not be built/);
+  });
+
+  it('converts to PDF and checks pages when LibreOffice is available', async () => {
+    const code = await jh('tailor', 'acme-full-stack-engineer-eu', '--json');
+    const summary = JSON.parse(out.join('\n'));
+    if (summary.pdf) {
+      expect(summary.pages.pages).toBeGreaterThanOrEqual(1);
+      expect(existsSync(join(cwd, summary.pdf))).toBe(true);
+      expect(code).toBe(summary.pages.ok ? 0 : 1);
+    } else {
+      expect(code).toBe(0);
+      expect(summary.pdfNote).toMatch(/soffice/);
+    }
+  }, 120_000);
 });
