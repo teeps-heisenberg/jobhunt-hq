@@ -286,6 +286,48 @@ describe('list, set-status, note, score', () => {
     });
   });
 
+  it('score reads a JSON file and lets flags override it', async () => {
+    writeFileSync(
+      join(cwd, 'score.json'),
+      JSON.stringify({
+        why: 'From file.',
+        gap: 'File gap.',
+        visaNote: 'Sponsorship available',
+        minYears: 2,
+        keyRequirements: ['TypeScript', 'React'],
+        salaryText: 'USD 3,000-4,000/month',
+        postedAt: '2026-10-21',
+      }),
+    );
+    expect(
+      await jh(
+        'score',
+        'acme-full-stack-engineer-eu',
+        '--from',
+        'score.json',
+        '--gap',
+        'Flag gap.',
+        '--json',
+      ),
+    ).toBe(0);
+    const { job, result } = JSON.parse(out.join('\n'));
+    expect(job).toMatchObject({
+      why: 'From file.',
+      gaps: 'Flag gap.',
+      visaNote: 'Sponsorship available',
+      salaryText: 'USD 3,000-4,000/month',
+      postedAt: '2026-10-21',
+      status: 'Shortlisted',
+    });
+    expect(result.factors.skills.value).toBe(1);
+    expect(result.factors.salary.value).toBe(1);
+
+    writeFileSync(join(cwd, 'bad.json'), JSON.stringify({ minYears: 'three' }));
+    expect(await jh('score', 'acme-full-stack-engineer-eu', '--from', 'bad.json')).toBe(2);
+    expect(err.at(-1)).toMatch(/invalid score file\.\n {2}- minYears/);
+    expect(await jh('score', 'acme-full-stack-engineer-eu', '--from', 'none.json')).toBe(2);
+  });
+
   it('score keeps a status the user set by hand', async () => {
     await jh('set-status', 'acme-full-stack-engineer-eu', 'Applied');
     out = [];

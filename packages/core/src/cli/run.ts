@@ -6,6 +6,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { z } from 'zod';
+
 import { findSoffice, importCv, Master } from '@jobhunt-hq/resume';
 
 import { ConfigError, loadConfig, loadProfile, loadRules } from '../config.js';
@@ -26,8 +28,14 @@ import {
   updateJob,
 } from '../db/repo.js';
 import { dedupeJobs, makeJobId } from '../dedupe.js';
-import type { JobStatus } from '../schema.js';
-import { JOB_STATUSES, type Job, type JobInput, ScoutOutput } from '../schema.js';
+import {
+  IsoDate,
+  JOB_STATUSES,
+  type Job,
+  type JobInput,
+  type JobStatus,
+  ScoutOutput,
+} from '../schema.js';
 import { scoreJob } from '../scoring.js';
 import { scoutBrief, sourceGroups } from '../search.js';
 import { csv, table, truncate } from './format.js';
@@ -51,8 +59,8 @@ Commands
                              --batch, --due, --limit, --format table|json|ids)
   set-status <id> <status>   change status (--note, --follow-up YYYY-MM-DD)
   note <id> <text>           add a dated note
-  score <id>                 store why/gap text and re-score (--why, --gap, --visa-note,
-                             --min-years, --requirements "a, b")
+  score <id>                 store why/gap text and re-score (--from file.json, or --why,
+                             --gap, --visa-note, --min-years, --requirements "a, b")
   show <id>                  one job with its events and artifacts
   stats                      funnel and follow-ups due
   export-csv [file]          export every job as CSV (stdout when no file)
@@ -97,6 +105,7 @@ const GLOBAL_OPTIONS = {
   'min-years': { type: 'string' },
   requirements: { type: 'string' },
   out: { type: 'string' },
+  from: { type: 'string' },
 } as const;
 
 class CliError extends Error {
@@ -513,18 +522,51 @@ function note(ctx: Ctx): void {
   ctx.io.out(ctx.values.json ? JSON.stringify(job, null, 2) : `${job.id}: note added`);
 }
 
+/** Fields `jh score --from <file.json>` accepts; command-line flags override them. */
+const ScoreFile = z.object({
+  why: z.string().optional(),
+  gap: z.string().optional(),
+  visaNote: z.string().optional(),
+  minYears: z.number().int().min(0).max(40).optional(),
+  keyRequirements: z.array(z.string().trim().min(1)).optional(),
+  salaryText: z.string().optional(),
+  postedAt: IsoDate.optional(),
+  remote: z.boolean().optional(),
+});
+
 function score(ctx: Ctx): void {
   const [id] = ctx.positionals;
   const job = requireJob(ctx, id);
   const { profile, rules } = loadRulesAndProfile(ctx);
   const candidateSkills =
     loadCandidateSkills(resolve(ctx.cwd, ctx.values.master ?? 'data/master.json')) ?? [];
-  const requirements =
-    ctx.values.requirements
-      ?.split(',')
-      .map((s) => s.trim())
-      .filter(Boolean) ?? [];
-  const minYears = num(ctx.values['min-years'], 'min-years');
+
+  let fromFile: z.infer<typeof ScoreFile> = {};
+  if (ctx.values.from) {
+    const path = resolve(ctx.cwd, ctx.values.from);
+    if (!existsSync(path)) throw new CliError(`File not found: ${path}`, 2);
+    const parsed = ScoreFile.safeParse(JSON.parse(readFileSync(path, 'utf8')));
+    if (!parsed.success) {
+      const issues = parsed.error.issues
+        .map((i) => `  - ${i.path.join('.') || '(root)'}: ${i.message}`)
+        .join('\n');
+      throw new CliError(`${path}: invalid score file.\n${issues}`, 2);
+    }
+    fromFile = parsed.data;
+  }
+
+  const flagRequirements = ctx.values.requirements
+    ?.split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const requirements = flagRequirements ?? fromFile.keyRequirements ?? [];
+  const minYears = num(ctx.values['min-years'], 'min-years') ?? fromFile.minYears;
+  const why = ctx.values.why ?? fromFile.why;
+  const gap = ctx.values.gap ?? fromFile.gap;
+  const visaNote = ctx.values['visa-note'] ?? fromFile.visaNote;
+  const salaryText = fromFile.salaryText ?? job.salaryText;
+  const postedAt = fromFile.postedAt ?? job.postedAt;
+  const remote = fromFile.remote ?? job.remote;
 
   const result = scoreJob({
     job: {
@@ -532,12 +574,12 @@ function score(ctx: Ctx): void {
       role: job.role,
       location: job.location,
       ...(job.region !== null ? { region: job.region } : {}),
-      remote: job.remote,
-      visaNote: ctx.values['visa-note'] ?? job.visaNote,
-      ...(job.postedAt !== null ? { postedAt: job.postedAt } : {}),
+      remote,
+      visaNote: visaNote ?? job.visaNote,
+      ...(postedAt !== null ? { postedAt } : {}),
       ...(minYears !== undefined ? { minYears } : {}),
       keyRequirements: requirements,
-      ...(job.salaryText !== null ? { salaryText: job.salaryText } : {}),
+      ...(salaryText !== null ? { salaryText } : {}),
     },
     profile,
     rules,
@@ -546,18 +588,19 @@ function score(ctx: Ctx): void {
   });
 
   const keepStatus = !['New', 'Shortlisted', 'Skipped'].includes(job.status);
+  const gaps = gap ?? job.gaps;
   const updated = updateJob(
     ctx.tracker().db,
     job.id,
     {
       score: result.score,
       ...(keepStatus ? {} : { status: result.status }),
-      ...(ctx.values.why !== undefined ? { why: ctx.values.why } : {}),
-      gaps: ctx.values.gap ?? job.gaps,
-      ...(result.blockers.length
-        ? { gaps: [ctx.values.gap ?? job.gaps, ...result.blockers].filter(Boolean).join(' | ') }
-        : {}),
-      visaNote: (ctx.values['visa-note'] ?? job.visaNote) || result.visaNote,
+      ...(why !== undefined ? { why } : {}),
+      gaps: result.blockers.length ? [gaps, ...result.blockers].filter(Boolean).join(' | ') : gaps,
+      visaNote: (visaNote ?? job.visaNote) || result.visaNote,
+      salaryText,
+      postedAt,
+      remote,
     },
     nowIso(ctx.today),
   );

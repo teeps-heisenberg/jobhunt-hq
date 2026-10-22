@@ -60,7 +60,7 @@ pnpm jh add-jobs <file.json> [--focus text] [--dry-run] [--json]
 pnpm jh list [--status S]... [--min-score N] [--company C] [--source S] [--batch B] [--due] [--limit N] [--format table|json|ids]
 pnpm jh set-status <id> <status> [--note text] [--follow-up YYYY-MM-DD]
 pnpm jh note <id> <text>
-pnpm jh score <id> [--why text] [--gap text] [--visa-note text] [--min-years N] [--requirements "a, b"]
+pnpm jh score <id> [--from file.json] [--why text] [--gap text] [--visa-note text] [--min-years N] [--requirements "a, b"]
 pnpm jh show <id> [--json]
 pnpm jh stats [--json]
 pnpm jh export-csv [file]
@@ -87,6 +87,9 @@ pnpm jh scout-brief <group> [--focus text] [--out file]
 
 ### Search skill (`/search`)
 `.claude/skills/job-search/SKILL.md` fans out one `job-scout` subagent per source group. `pnpm jh sources` lists the groups (`bigTech`, `ats`, `remote`, `research`, `custom`) with their enabled state from `rules.sources`; `pnpm jh scout-brief <group>` writes `data/scout/<group>.md`, the brief every scout reads: where to look, the candidate summary, the rules in priority order with the recency cut-off date, every tracked role to skip, and the exact JSON output shape. Scouts return JSON only; `pnpm jh add-jobs` validates, dedupes, scores and stores it.
+
+### Score skill (`/score`)
+`.claude/skills/score-job/SKILL.md` adds a pasted URL through `jh add-jobs` when needed, reads the posting against the rules with the hard blockers first, writes `data/scout/<id>.score.json` (why, gap, visa note, the posting's must-haves as it names them, minimum years, salary, posting date) and runs `pnpm jh score <id> --from <that file>`. The engine computes the number and suggests the status; the skill never sets a score by hand, and a disputed number is fixed by correcting the inputs or the rules.
 
 ## Status
 Work in progress. See `docs/SPEC.md` and `docs/TASKS.md`.
