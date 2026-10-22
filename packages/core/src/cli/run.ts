@@ -12,14 +12,19 @@ import {
   buildVariant,
   checkPages,
   convertToPdf,
+  type CoverLetter,
   findSoffice,
   formatIssue,
   importCv,
   lintText,
   Master,
+  Pack,
   packFolder,
+  packToText,
   type PageCheck,
+  renderPackMarkdown,
   resumeToText,
+  writeCoverLetterDocx,
   writeDocx,
 } from '@jobhunt-hq/resume';
 
@@ -51,6 +56,7 @@ import {
   ScoutOutput,
 } from '../schema.js';
 import { scoreJob } from '../scoring.js';
+import { standardScreening } from '../screening.js';
 import { scoutBrief, sourceGroups } from '../search.js';
 import { csv, table, truncate } from './format.js';
 import { loadCandidateSkills } from './skills.js';
@@ -78,6 +84,8 @@ Commands
   show <id>                  one job with its events and artifacts
   tailor <id|generic>        render the CV for a job: DOCX, PDF, page check, style lint
                              (--variant spec.json, --no-pdf)
+  pack <id> --from pack.json write output/<company>/<role>/pack.md and cover.docx with
+                             screening answers from the rules and the verify list
   stats                      funnel and follow-ups due
   export-csv [file]          export every job as CSV (stdout when no file)
   import-cv <file>           extract text from a DOCX, PDF or TXT CV into data/imports/
@@ -216,6 +224,7 @@ const COMMANDS: Record<string, Handler> = {
   score,
   show,
   tailor,
+  pack,
   stats,
   'export-csv': exportCsv,
   'import-cv': importCvCmd,
@@ -1009,4 +1018,182 @@ async function tailor(ctx: Ctx): Promise<void> {
 
 function rel(cwd: string, path: string): string {
   return relative(cwd, path).split('\\').join('/');
+}
+
+// ---------------------------------------------------------------------------
+// pack
+// ---------------------------------------------------------------------------
+
+/** What the pack skill writes; the CLI fills the job, files, date and standard screening. */
+const PackInput = z.object({
+  coverNote: z.array(z.string().trim().min(1)).min(1),
+  whyThisRole: z.array(z.string().trim().min(1)).default([]),
+  screening: z
+    .array(
+      z.object({
+        question: z.string().trim().min(1),
+        answer: z.string().trim().min(1),
+        source: z.string().optional(),
+      }),
+    )
+    .default([]),
+  notes: z.array(z.string().trim().min(1)).default([]),
+  verify: z
+    .array(
+      z.object({
+        text: z.string().trim().min(1),
+        where: z.string().optional(),
+        reason: z.string().optional(),
+      }),
+    )
+    .default([]),
+  /** Cover letter addressee and subject; default to the hiring team and the role. */
+  to: z.string().trim().min(1).optional(),
+  re: z.string().trim().min(1).optional(),
+});
+
+async function pack(ctx: Ctx): Promise<void> {
+  const [id] = ctx.positionals;
+  if (!id || !ctx.values.from) {
+    throw new CliError('Usage: jh pack <id> --from pack.json [--json]', 2);
+  }
+  const job = requireJob(ctx, id);
+  const { profile, rules } = loadRulesAndProfile(ctx);
+
+  const path = resolve(ctx.cwd, ctx.values.from);
+  if (!existsSync(path)) throw new CliError(`File not found: ${path}`, 2);
+  const parsed = PackInput.safeParse(JSON.parse(readFileSync(path, 'utf8')));
+  if (!parsed.success) {
+    const issues = parsed.error.issues
+      .map((i) => `  - ${i.path.join('.') || '(root)'}: ${i.message}`)
+      .join('\n');
+    throw new CliError(`${path}: invalid pack file.\n${issues}`, 2);
+  }
+  const input = parsed.data;
+
+  const { db } = ctx.tracker();
+  const artifacts = listArtifacts(db, job.id);
+  const latest = (kind: string) => artifacts.find((a) => a.kind === kind)?.path;
+  const folder = resolve(ctx.cwd, packFolder(job.company, job.role));
+  mkdirSync(folder, { recursive: true });
+
+  // Standard answers from profile and rules; the skill's answers win on the same question.
+  const provided = new Set(input.screening.map((s) => s.question.toLowerCase()));
+  const screening = [
+    ...standardScreening(job, profile, rules).filter(
+      (s) => !provided.has(s.question.toLowerCase()),
+    ),
+    ...input.screening,
+  ];
+
+  // Verify list: the skill's items plus anything the CV artifacts flagged.
+  const seen = new Set(input.verify.map((v) => v.text.toLowerCase()));
+  const verify = [...input.verify];
+  for (const item of artifacts.find((a) => a.kind === 'cv_docx')?.verifyItems ?? []) {
+    const [where, ...rest] = item.split(': ');
+    const text = rest.join(': ') || item;
+    if (!seen.has(text.toLowerCase())) {
+      seen.add(text.toLowerCase());
+      verify.push({ text, where: `cv.${where}`, reason: 'not in master.json' });
+    }
+  }
+
+  const coverPath = join(folder, 'cover.docx');
+  const letter: CoverLetter = {
+    from: {
+      name: profile.name,
+      contact: [profile.contact.location, profile.contact.email, profile.contact.phone]
+        .filter((s): s is string => Boolean(s))
+        .join(' | '),
+    },
+    date: longDate(ctx.today),
+    to: input.to ?? `Hiring Team, ${job.company}`,
+    re: input.re ?? job.role,
+    paras: input.coverNote,
+    closing: 'Kind regards,',
+  };
+  await writeCoverLetterDocx(letter, coverPath);
+
+  const cvPdf = latest('cv_pdf');
+  const cvDocx = latest('cv_docx');
+  const packData: Pack = Pack.parse({
+    job: {
+      id: job.id,
+      company: job.company,
+      role: job.role,
+      location: job.location,
+      url: job.url,
+      ...(job.applyUrl ? { applyUrl: job.applyUrl } : {}),
+    },
+    generatedAt: ctx.today,
+    coverNote: input.coverNote,
+    whyThisRole: input.whyThisRole,
+    screening,
+    notes: input.notes,
+    verify,
+    files: {
+      ...(cvPdf ? { cvPdf } : {}),
+      ...(cvDocx ? { cvDocx } : {}),
+      coverDocx: rel(ctx.cwd, coverPath),
+    },
+  });
+  const markdown = renderPackMarkdown(packData);
+  const packPath = join(folder, 'pack.md');
+  writeFileSync(packPath, markdown, 'utf8');
+
+  const lintIssues = lintText(packToText(packData), {
+    bannedCharacters: rules.style.bannedCharacters,
+    bannedPhrases: rules.style.bannedPhrases,
+  });
+
+  const verifyItems = verify.map((v) => (v.where ? `${v.where}: ${v.text}` : v.text));
+  const at = nowIso(ctx.today);
+  addArtifact(db, { jobId: job.id, kind: 'cover', path: rel(ctx.cwd, coverPath), verifyItems }, at);
+  addArtifact(db, { jobId: job.id, kind: 'pack', path: rel(ctx.cwd, packPath), verifyItems }, at);
+
+  const ok = lintIssues.length === 0;
+  const summary = {
+    job: job.id,
+    pack: rel(ctx.cwd, packPath),
+    cover: rel(ctx.cwd, coverPath),
+    cv: { pdf: cvPdf ?? null, docx: cvDocx ?? null },
+    screening,
+    verify,
+    lint: lintIssues.map(formatIssue),
+    ok,
+  };
+  if (ctx.values.json) {
+    ctx.io.out(JSON.stringify(summary, null, 2));
+  } else {
+    ctx.io.out(`${job.id}: ${ok ? 'OK' : 'NEEDS WORK'}`);
+    ctx.io.out(`  pack   ${summary.pack}`);
+    ctx.io.out(`  cover  ${summary.cover}`);
+    ctx.io.out(`  cv     ${cvPdf ?? cvDocx ?? 'none yet: run jh tailor first'}`);
+    ctx.io.out(
+      lintIssues.length
+        ? `  lint   ${lintIssues.length} issue${lintIssues.length === 1 ? '' : 's'}`
+        : '  lint   clean',
+    );
+    for (const issue of lintIssues) ctx.io.out(`    ${formatIssue(issue)}`);
+    ctx.io.out(`  screening answers: ${screening.length}`);
+    for (const s of screening)
+      ctx.io.out(`    - ${s.question}: ${s.answer}${s.source ? ` (${s.source})` : ''}`);
+    ctx.io.out(
+      verify.length
+        ? `  verify before sending (${verify.length}):`
+        : '  verify before sending: nothing flagged',
+    );
+    for (const v of verify) ctx.io.out(`    - ${v.text}${v.where ? ` (${v.where})` : ''}`);
+  }
+  if (!ok) throw new CliError('style lint failed', 1);
+}
+
+function longDate(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  return d.toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
 }

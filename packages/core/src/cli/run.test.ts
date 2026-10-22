@@ -608,3 +608,90 @@ describe('tailor', () => {
     }
   }, 120_000);
 });
+
+describe('pack', () => {
+  beforeEach(async () => {
+    await jh('add-jobs', writeScout('one.json', [scoutRows[0]]));
+    writeFileSync(
+      join(cwd, 'spec.json'),
+      JSON.stringify({
+        experience: [{ company: 'Example Agency', bullets: ['Led a team of four engineers.'] }],
+      }),
+    );
+    await jh('tailor', 'acme-full-stack-engineer-eu', '--variant', 'spec.json', '--no-pdf');
+    writeFileSync(
+      join(cwd, 'pack.json'),
+      JSON.stringify({
+        coverNote: [
+          'I am applying for the Full Stack Engineer role at Acme.',
+          'Thank you for your time.',
+        ],
+        whyThisRole: ['Next.js and NestJS match the posting.'],
+        screening: [{ question: 'Notice period', answer: '2 weeks, negotiable' }],
+        notes: ['The form asks for a cover letter.'],
+        verify: [
+          {
+            text: 'used by 200 clinics',
+            where: 'cover.para 1',
+            reason: 'number differs from master',
+          },
+        ],
+      }),
+    );
+    out = [];
+    err = [];
+  });
+
+  it('writes pack.md and cover.docx, merges screening and verify, records artifacts', async () => {
+    expect(await jh('pack', 'acme-full-stack-engineer-eu', '--from', 'pack.json')).toBe(0);
+    const text = out.join('\n');
+    expect(text).toContain('acme-full-stack-engineer-eu: OK');
+    expect(text).toContain('pack   output/acme/full-stack-engineer/pack.md');
+    expect(text).toContain('cover  output/acme/full-stack-engineer/cover.docx');
+    expect(text).toContain('cv     output/acme/full-stack-engineer/cv.docx');
+    expect(text).toContain('- Years of professional experience: 3 (profile.yearsExperience)');
+    expect(text).toContain(
+      '- Salary expectation: USD 2,500-3,500/month, flexible (rules.salary.remote)',
+    );
+    expect(text).toContain('- Notice period: 2 weeks, negotiable');
+    expect(text).not.toContain('Notice period: 1 month');
+    expect(text).toContain('- Work authorisation: Can work in Remote - EU without sponsorship');
+    expect(text).toContain('verify before sending (2):');
+    expect(text).toContain('- used by 200 clinics (cover.para 1)');
+    expect(text).toContain('- Led a team of four engineers. (cv.experience.Example Agency)');
+
+    const md = readFileSync(join(cwd, 'output/acme/full-stack-engineer/pack.md'), 'utf8');
+    expect(md).toContain('# Acme: Full Stack Engineer');
+    expect(md).toContain('- **Cover letter (DOCX):** output/acme/full-stack-engineer/cover.docx');
+    expect(md).toContain('## Read before applying\n\n- The form asks for a cover letter.');
+    expect(md).toContain(
+      '- **Salary expectation:** USD 2,500-3,500/month, flexible (from rules.salary.remote)',
+    );
+    expect(existsSync(join(cwd, 'output/acme/full-stack-engineer/cover.docx'))).toBe(true);
+
+    out = [];
+    await jh('show', 'acme-full-stack-engineer-eu', '--json');
+    const { artifacts } = JSON.parse(out.join('\n'));
+    expect(artifacts.map((a: { kind: string }) => a.kind).sort()).toEqual([
+      'cover',
+      'cv_docx',
+      'pack',
+    ]);
+    expect(artifacts.find((a: { kind: string }) => a.kind === 'pack').verifyItems).toEqual([
+      'cover.para 1: used by 200 clinics',
+      'cv.experience.Example Agency: Led a team of four engineers.',
+    ]);
+  });
+
+  it('fails lint on an em dash in the cover note and reports bad input', async () => {
+    writeFileSync(join(cwd, 'dash.json'), JSON.stringify({ coverNote: ['Fast — reliable.'] }));
+    expect(await jh('pack', 'acme-full-stack-engineer-eu', '--from', 'dash.json')).toBe(1);
+    expect(out.join('\n')).toMatch(/NEEDS WORK[\s\S]*em dash/);
+
+    writeFileSync(join(cwd, 'empty.json'), JSON.stringify({ coverNote: [] }));
+    expect(await jh('pack', 'acme-full-stack-engineer-eu', '--from', 'empty.json')).toBe(2);
+    expect(err.at(-1)).toMatch(/invalid pack file\.\n {2}- coverNote/);
+    expect(await jh('pack', 'acme-full-stack-engineer-eu')).toBe(2);
+    expect(await jh('pack', 'missing', '--from', 'pack.json')).toBe(1);
+  });
+});

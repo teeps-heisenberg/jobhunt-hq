@@ -63,6 +63,7 @@ pnpm jh note <id> <text>
 pnpm jh score <id> [--from file.json] [--why text] [--gap text] [--visa-note text] [--min-years N] [--requirements "a, b"]
 pnpm jh show <id> [--json]
 pnpm jh tailor <id|generic> [--variant spec.json] [--no-pdf] [--json]
+pnpm jh pack <id> --from pack.json [--json]
 pnpm jh stats [--json]
 pnpm jh export-csv [file]
 pnpm jh import-cv <file.docx|.pdf|.txt> [--out file.txt]
@@ -94,6 +95,9 @@ pnpm jh scout-brief <group> [--focus text] [--out file]
 
 ### Tailor skill (`/tailor`) and claim checker
 `.claude/skills/tailor-resume/SKILL.md` writes a `VariantSpec` (title, summary, skill order and overrides, project order and cap, at most three re-phrased bullets) and runs `pnpm jh tailor <id> --variant <spec>`. The command renders `output/<company>/<role>/cv.docx` and `cv.pdf`, checks the exact page count against `rules.style.maxPages`, runs the style lint, records both files as artifacts, and prints every piece of text that is not in `data/master.json` as "verify before sending". It exits non-zero until pages and lint pass. The `claim-checker` subagent (`.claude/agents/claim-checker.md`) then classifies every sentence as supported, rephrased or new, and the two lists are merged into the pack's verify section. `pnpm jh tailor generic` renders the untailored master for a layout check.
+
+### Pack skill (`/pack`)
+`.claude/skills/pack/SKILL.md` writes `data/scout/<id>.pack.json` (cover note paragraphs, why this role, extra screening answers, posting notes, verify items) and runs `pnpm jh pack <id> --from <that file>`. The command adds the standard screening answers from the rules (years from the profile, the `rules.salary` band for the job's location with "flexible", notice period, work authorisation), merges the verify items the tailored CV already carries, renders `output/<company>/<role>/pack.md` and `cover.docx`, lints the text, and records both as artifacts.
 
 ## Status
 Work in progress. See `docs/SPEC.md` and `docs/TASKS.md`.

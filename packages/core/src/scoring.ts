@@ -454,9 +454,9 @@ export function parseMoney(text: string | undefined): Money | undefined {
 }
 
 /** The rules.salary entry for this job: `remote` for remote roles, else any place the location implies. */
-function salaryBand(
+export function salaryBand(
   a: LocationAssessment,
-  job: ScoreInput['job'],
+  job: Pick<ScoreInput['job'], 'location'>,
   rules: Rules,
 ): [string, string] | undefined {
   const keys = a.fit === 'remote' ? new Set(['remote']) : placesOf(job.location);
