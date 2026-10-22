@@ -1,6 +1,6 @@
 {
   "name": "@jobhunt-hq/resume",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Master CV schema, variant builder, DOCX and PDF render, page check and style lint.",
   "license": "MIT",

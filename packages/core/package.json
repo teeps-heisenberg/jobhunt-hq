@@ -1,6 +1,6 @@
 {
   "name": "@jobhunt-hq/core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Schemas, scoring, dedupe, SQLite tracker and the jh CLI.",
   "license": "MIT",
