@@ -33,6 +33,7 @@ import { ConfigError, loadConfig, loadProfile, loadRules } from '../config.js';
 import { openDb, type Tracker } from '../db/client.js';
 import {
   addArtifact,
+  addEvent,
   addNote,
   getJob,
   getStats,
@@ -89,6 +90,9 @@ Commands
                              screening answers from the rules and the verify list
   apply-plan <id>            fields the apply-assist skill may fill, with values and sources
                              (--from pack.json, --json)
+  followups                  follow-ups due today (--days N for the coming days, --json)
+  followup-sent <id>         record a sent follow-up and set the next date (--follow-up, --note,
+                             --channel)
   stats                      funnel and follow-ups due
   export-csv [file]          export every job as CSV (stdout when no file)
   import-cv <file>           extract text from a DOCX, PDF or TXT CV into data/imports/
@@ -136,6 +140,8 @@ const GLOBAL_OPTIONS = {
   from: { type: 'string' },
   variant: { type: 'string' },
   'no-pdf': { type: 'boolean', default: false },
+  days: { type: 'string' },
+  channel: { type: 'string' },
 } as const;
 
 class CliError extends Error {
@@ -229,6 +235,8 @@ const COMMANDS: Record<string, Handler> = {
   tailor,
   pack,
   'apply-plan': applyPlan,
+  followups,
+  'followup-sent': followupSent,
   stats,
   'export-csv': exportCsv,
   'import-cv': importCvCmd,
@@ -1261,4 +1269,95 @@ function applyPlan(ctx: Ctx): void {
   for (const u of plan.uploads) ctx.io.out(`    ${u.key.padEnd(16)} ${u.path}`);
   ctx.io.out('  left for you:');
   for (const s of plan.stopBefore) ctx.io.out(`    - ${s}`);
+}
+
+// ---------------------------------------------------------------------------
+// followups, followup-sent
+// ---------------------------------------------------------------------------
+
+const FOLLOW_UP_STATUSES: JobStatus[] = ['Applied', 'Responded', 'Interview'];
+
+function daysBetween(from: string, to: string): number {
+  return Math.round(
+    (Date.parse(`${to.slice(0, 10)}T00:00:00Z`) - Date.parse(`${from.slice(0, 10)}T00:00:00Z`)) /
+      86_400_000,
+  );
+}
+
+function followups(ctx: Ctx): void {
+  const horizon = num(ctx.values.days, 'days') ?? 0;
+  const until = addDays(ctx.today, horizon);
+  const { db } = ctx.tracker();
+  const rows = listJobs(db, { status: FOLLOW_UP_STATUSES, followUpDue: until }).map((job) => {
+    const events = listEvents(db, job.id);
+    const sent = events.filter((e) => e.type === 'follow_up_sent');
+    const last = events[events.length - 1];
+    return {
+      id: job.id,
+      company: job.company,
+      role: job.role,
+      status: job.status,
+      url: job.url,
+      appliedAt: job.appliedAt,
+      followUpAt: job.followUpAt,
+      overdueDays: job.followUpAt ? daysBetween(job.followUpAt, ctx.today) : 0,
+      daysSinceApplied: job.appliedAt ? daysBetween(job.appliedAt, ctx.today) : null,
+      followUpsSent: sent.length,
+      lastEvent: last ? { at: last.at, type: last.type, payload: last.payload } : null,
+      notes: job.notes,
+    };
+  });
+  rows.sort((a, b) => b.overdueDays - a.overdueDays);
+
+  if (ctx.values.json) {
+    ctx.io.out(JSON.stringify(rows, null, 2));
+    return;
+  }
+  if (rows.length === 0) {
+    ctx.io.out(horizon ? `No follow-ups due within ${horizon} days.` : 'No follow-ups due today.');
+    return;
+  }
+  ctx.io.out(
+    table(
+      ['id', 'status', 'company', 'role', 'applied', 'follow-up', 'overdue', 'sent'],
+      rows.map((r) => [
+        r.id,
+        r.status,
+        truncate(r.company, 22),
+        truncate(r.role, 30),
+        r.appliedAt?.slice(0, 10) ?? '',
+        r.followUpAt ?? '',
+        r.overdueDays > 0
+          ? `${r.overdueDays}d`
+          : r.overdueDays === 0
+            ? 'today'
+            : `in ${-r.overdueDays}d`,
+        r.followUpsSent,
+      ]),
+    ),
+  );
+}
+
+function followupSent(ctx: Ctx): void {
+  const [id] = ctx.positionals;
+  const job = requireJob(ctx, id);
+  let days = 10;
+  try {
+    days = loadRulesAndProfile(ctx).rules.followUpDays;
+  } catch {
+    ctx.io.err(`warning: config not found, using a ${days}-day follow-up`);
+  }
+  const next = ctx.values['follow-up'] ?? addDays(ctx.today, days);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(next)) throw new CliError('--follow-up must be YYYY-MM-DD', 2);
+  const at = nowIso(ctx.today);
+  const { db } = ctx.tracker();
+  const payload: Record<string, unknown> = { channel: ctx.values.channel ?? 'email' };
+  if (ctx.values.note) payload['note'] = ctx.values.note;
+  addEvent(db, job.id, 'follow_up_sent', payload, at);
+  const updated = updateJob(db, job.id, { followUpAt: next }, at);
+  if (ctx.values.json) {
+    ctx.io.out(JSON.stringify(updated, null, 2));
+    return;
+  }
+  ctx.io.out(`${updated.id}: follow-up recorded, next on ${next}`);
 }

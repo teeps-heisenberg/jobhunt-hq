@@ -734,3 +734,52 @@ describe('apply-plan', () => {
     expect(await jh('apply-plan', 'acme-full-stack-engineer-eu', '--from', 'none.json')).toBe(2);
   });
 });
+
+describe('followups', () => {
+  beforeEach(async () => {
+    await jh('add-jobs', writeScout());
+    await jh('set-status', 'acme-full-stack-engineer-eu', 'Applied', '--follow-up', '2026-10-20');
+    out = [];
+    err = [];
+  });
+
+  it('lists due follow-ups with overdue days and sent count', async () => {
+    expect(await jh('followups')).toBe(0);
+    expect(out[0]).toMatch(
+      /acme-full-stack-engineer-eu\s+Applied\s+Acme\s+Full Stack Engineer\s+2026-10-22\s+2026-10-20\s+2d\s+0/,
+    );
+
+    out = [];
+    await jh('followups', '--json');
+    const [row] = JSON.parse(out.join('\n'));
+    expect(row).toMatchObject({
+      id: 'acme-full-stack-engineer-eu',
+      overdueDays: 2,
+      daysSinceApplied: 0,
+      followUpsSent: 0,
+    });
+    expect(row.lastEvent.type).toBe('status_change');
+  });
+
+  it('records a sent follow-up and pushes the date by rules.followUpDays', async () => {
+    expect(
+      await jh('followup-sent', 'acme-full-stack-engineer-eu', '--note', 'Emailed the recruiter'),
+    ).toBe(0);
+    expect(out[0]).toBe('acme-full-stack-engineer-eu: follow-up recorded, next on 2026-11-01');
+    out = [];
+    await jh('followups');
+    expect(out[0]).toBe('No follow-ups due today.');
+    out = [];
+    await jh('followups', '--days', '14');
+    expect(out[0]).toMatch(/in 10d\s+1$/m);
+    out = [];
+    await jh('show', 'acme-full-stack-engineer-eu', '--json');
+    const { events } = JSON.parse(out.join('\n'));
+    expect(events.at(-1)).toMatchObject({
+      type: 'follow_up_sent',
+      payload: { channel: 'email', note: 'Emailed the recruiter' },
+    });
+    expect(await jh('followup-sent', 'acme-full-stack-engineer-eu', '--follow-up', 'soon')).toBe(2);
+    expect(await jh('followup-sent', 'missing')).toBe(1);
+  });
+});
