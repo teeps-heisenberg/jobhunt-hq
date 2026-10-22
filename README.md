@@ -66,6 +66,8 @@ pnpm jh stats [--json]
 pnpm jh export-csv [file]
 pnpm jh import-cv <file.docx|.pdf|.txt> [--out file.txt]
 pnpm jh doctor [--json]
+pnpm jh sources [--json]
+pnpm jh scout-brief <group> [--focus text] [--out file]
 ```
 
 `add-jobs` accepts a JSON array of scout rows or `{jobs, rejected}`, validates them against `JobInput`, dedupes against the tracker and within the batch, scores each new row with the rules and `data/master.json`, and records a search run. Moving a job to `Applied` sets the follow-up date from `rules.followUpDays` unless `--follow-up` is given. Global options: `--db <path>` (or `JH_DB`), `--config-dir <dir>`, `--master <file>`.
@@ -82,6 +84,9 @@ pnpm jh doctor [--json]
 
 ### Setup skill (`/setup`)
 `.claude/skills/setup-profile/SKILL.md` walks a new user from an existing CV to validated config: `pnpm jh import-cv <cv>` extracts the text (DOCX via the zip, PDF via pdf.js) into `data/imports/`, Claude drafts `data/master.json` from it without embellishing, interviews for what the CV does not hold, writes `config/profile.yaml` and `config/rules.yaml` from the examples, and `pnpm jh doctor` validates all three files, opens the database and checks for LibreOffice.
+
+### Search skill (`/search`)
+`.claude/skills/job-search/SKILL.md` fans out one `job-scout` subagent per source group. `pnpm jh sources` lists the groups (`bigTech`, `ats`, `remote`, `research`, `custom`) with their enabled state from `rules.sources`; `pnpm jh scout-brief <group>` writes `data/scout/<group>.md`, the brief every scout reads: where to look, the candidate summary, the rules in priority order with the recency cut-off date, every tracked role to skip, and the exact JSON output shape. Scouts return JSON only; `pnpm jh add-jobs` validates, dedupes, scores and stores it.
 
 ## Status
 Work in progress. See `docs/SPEC.md` and `docs/TASKS.md`.

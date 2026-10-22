@@ -29,6 +29,7 @@ import { dedupeJobs, makeJobId } from '../dedupe.js';
 import type { JobStatus } from '../schema.js';
 import { JOB_STATUSES, type Job, type JobInput, ScoutOutput } from '../schema.js';
 import { scoreJob } from '../scoring.js';
+import { scoutBrief, sourceGroups } from '../search.js';
 import { csv, table, truncate } from './format.js';
 import { loadCandidateSkills } from './skills.js';
 
@@ -56,6 +57,8 @@ Commands
   stats                      funnel and follow-ups due
   export-csv [file]          export every job as CSV (stdout when no file)
   import-cv <file>           extract text from a DOCX, PDF or TXT CV into data/imports/
+  sources                    source groups for /search, from rules.sources
+  scout-brief <group>        write the brief one job-scout receives (--focus, --out)
   doctor                     validate profile.yaml, rules.yaml and master.json; check DB and LibreOffice
 
 Global options
@@ -188,6 +191,8 @@ const COMMANDS: Record<string, Handler> = {
   'export-csv': exportCsv,
   'import-cv': importCvCmd,
   doctor,
+  sources,
+  'scout-brief': scoutBriefCmd,
 };
 
 // ---------------------------------------------------------------------------
@@ -765,4 +770,59 @@ function doctor(ctx: Ctx): void {
   if (failed.length) {
     throw new CliError(`${failed.length} check${failed.length === 1 ? '' : 's'} failed`, 1);
   }
+}
+
+// ---------------------------------------------------------------------------
+// sources, scout-brief
+// ---------------------------------------------------------------------------
+
+function sources(ctx: Ctx): void {
+  const { rules } = loadRulesAndProfile(ctx);
+  const groups = sourceGroups(rules);
+  if (ctx.values.json) {
+    ctx.io.out(JSON.stringify(groups, null, 2));
+    return;
+  }
+  ctx.io.out(
+    table(
+      ['group', 'enabled', 'label', 'targets'],
+      groups.map((g) => [
+        g.key,
+        g.enabled ? 'yes' : 'no',
+        g.label,
+        truncate(g.targets.join(', '), 60),
+      ]),
+    ),
+  );
+}
+
+function scoutBriefCmd(ctx: Ctx): void {
+  const key = ctx.positionals[0];
+  const { profile, rules } = loadRulesAndProfile(ctx);
+  const groups = sourceGroups(rules);
+  const group = groups.find((g) => g.key.toLowerCase() === key?.toLowerCase());
+  if (!group) {
+    throw new CliError(
+      `Usage: jh scout-brief <group> [--focus text] [--out file]. Groups: ${groups.map((g) => g.key).join(', ')}`,
+      2,
+    );
+  }
+  if (!group.enabled) ctx.io.err(`warning: ${group.key} is disabled in rules.sources`);
+  const tracked = listJobKeys(ctx.tracker().db);
+  const brief = scoutBrief({
+    group,
+    profile,
+    rules,
+    tracked,
+    focus: ctx.values.focus,
+    today: ctx.today,
+  });
+  const out = resolve(ctx.cwd, ctx.values.out ?? join('data', 'scout', `${group.key}.md`));
+  mkdirSync(dirname(out), { recursive: true });
+  writeFileSync(out, brief, 'utf8');
+  if (ctx.values.json) {
+    ctx.io.out(JSON.stringify({ group: group.key, out, tracked: tracked.length }, null, 2));
+    return;
+  }
+  ctx.io.out(out);
 }

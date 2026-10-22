@@ -426,3 +426,40 @@ describe('show, import-cv, doctor', () => {
     ]);
   });
 });
+
+describe('sources and scout-brief', () => {
+  it('lists source groups from rules', async () => {
+    expect(await jh('sources')).toBe(0);
+    expect(out[0]).toMatch(/^group\s+enabled\s+label/);
+    expect(out[0]).toMatch(
+      /^ats\s+yes\s+Startups via public ATS boards\s+greenhouse, lever, ashby, workable$/m,
+    );
+    out = [];
+    await jh('sources', '--json');
+    expect(JSON.parse(out.join('\n'))).toHaveLength(5);
+  });
+
+  it('writes a brief with the tracked roles and reports the path', async () => {
+    await jh('add-jobs', writeScout('one.json', [scoutRows[0]]));
+    out = [];
+    expect(await jh('scout-brief', 'ats', '--focus', 'fintech')).toBe(0);
+    const path = out[0]!;
+    expect(path).toMatch(/data[\\/]scout[\\/]ats\.md$/);
+    const brief = readFileSync(path, 'utf8');
+    expect(brief).toContain('# Job scout brief: Startups via public ATS boards');
+    expect(brief).toContain('Focus for this run: fintech.');
+    expect(brief).toContain(
+      '- Acme | Full Stack Engineer | Remote - EU | https://boards.greenhouse.io/acme/jobs/111',
+    );
+    expect(brief).toContain('Date: 2026-10-22');
+
+    out = [];
+    expect(await jh('scout-brief', 'BigTech', '--out', 'brief.md', '--json')).toBe(0);
+    expect(JSON.parse(out.join('\n'))).toMatchObject({ group: 'bigTech', tracked: 1 });
+    expect(readFileSync(join(cwd, 'brief.md'), 'utf8')).toContain('careers.google.com');
+
+    expect(await jh('scout-brief', 'linkedin')).toBe(2);
+    expect(err.at(-1)).toMatch(/Groups: bigTech, ats, remote, research, custom/);
+    expect(await jh('scout-brief')).toBe(2);
+  });
+});
