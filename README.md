@@ -40,6 +40,9 @@ pnpm jh            # the CLI (commands land in M1 task 6)
 
 CI runs the same four checks on every push and pull request (`.github/workflows/ci.yml`).
 
+### Core package
+`packages/core/src/schema.ts` holds the zod schemas for every boundary: `JobInput` (what a job-scout returns and `jh add-jobs` accepts), `Job`, `JobStatus`, `Artifact`, `Event`, `SearchRun`, `Profile` and `Rules`. `loadConfig()` in `config.ts` reads `config/profile.yaml` and `config/rules.yaml`, fills defaults, and throws a `ConfigError` that names the file and every invalid field. The example files in `config/` are validated in tests.
+
 ## Status
 Work in progress. See `docs/SPEC.md` and `docs/TASKS.md`.
 
