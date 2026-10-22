@@ -3,16 +3,20 @@
  * `run()` is pure with respect to process state so tests can drive it with a temp database.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { basename, dirname, extname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
-import { ConfigError, loadConfig } from '../config.js';
+import { findSoffice, importCv, Master } from '@jobhunt-hq/resume';
+
+import { ConfigError, loadConfig, loadProfile, loadRules } from '../config.js';
 import { openDb, type Tracker } from '../db/client.js';
 import {
   addNote,
   getJob,
   getStats,
   insertJobs,
+  listArtifacts,
+  listEvents,
   listJobKeys,
   listJobs,
   type NewJob,
@@ -48,8 +52,11 @@ Commands
   note <id> <text>           add a dated note
   score <id>                 store why/gap text and re-score (--why, --gap, --visa-note,
                              --min-years, --requirements "a, b")
+  show <id>                  one job with its events and artifacts
   stats                      funnel and follow-ups due
   export-csv [file]          export every job as CSV (stdout when no file)
+  import-cv <file>           extract text from a DOCX, PDF or TXT CV into data/imports/
+  doctor                     validate profile.yaml, rules.yaml and master.json; check DB and LibreOffice
 
 Global options
   --db <path>                SQLite file (default: $JH_DB or data/jobhunt.db)
@@ -86,6 +93,7 @@ const GLOBAL_OPTIONS = {
   'visa-note': { type: 'string' },
   'min-years': { type: 'string' },
   requirements: { type: 'string' },
+  out: { type: 'string' },
 } as const;
 
 class CliError extends Error {
@@ -175,8 +183,11 @@ const COMMANDS: Record<string, Handler> = {
   'set-status': setStatusCmd,
   note,
   score,
+  show,
   stats,
   'export-csv': exportCsv,
+  'import-cv': importCvCmd,
+  doctor,
 };
 
 // ---------------------------------------------------------------------------
@@ -595,5 +606,163 @@ function exportCsv(ctx: Ctx): void {
     ctx.io.out(`Wrote ${jobs.length} jobs to ${path}`);
   } else {
     ctx.io.out(text.trimEnd());
+  }
+}
+
+// ---------------------------------------------------------------------------
+// show, import-cv, doctor
+// ---------------------------------------------------------------------------
+
+function show(ctx: Ctx): void {
+  const job = requireJob(ctx, ctx.positionals[0]);
+  const { db } = ctx.tracker();
+  const events = listEvents(db, job.id);
+  const artifacts = listArtifacts(db, job.id);
+  if (ctx.values.json) {
+    ctx.io.out(JSON.stringify({ job, events, artifacts }, null, 2));
+    return;
+  }
+  const field = (k: string, v: string | number | boolean | null) => {
+    if (v !== null && v !== '') ctx.io.out(`${k.padEnd(12)} ${String(v)}`);
+  };
+  ctx.io.out(`${job.company}: ${job.role}`);
+  field('id', job.id);
+  field('status', job.status);
+  field('score', job.score.toFixed(1));
+  field('location', `${job.location}${job.remote ? ' (remote)' : ''}`);
+  field('region', job.region);
+  field('url', job.url);
+  field('apply', job.applyUrl);
+  field('salary', job.salaryText);
+  field('posted', job.postedAt);
+  field('found', job.foundAt.slice(0, 10));
+  field('applied', job.appliedAt);
+  field('follow-up', job.followUpAt);
+  field('source', `${job.source}${job.batch ? ` (${job.batch})` : ''}`);
+  field('why', job.why);
+  field('gaps', job.gaps);
+  field('visa', job.visaNote);
+  if (job.notes) {
+    ctx.io.out('notes');
+    for (const line of job.notes.split('\n')) ctx.io.out(`  ${line}`);
+  }
+  if (artifacts.length) {
+    ctx.io.out('artifacts');
+    for (const a of artifacts) {
+      const verify = a.verifyItems.length ? ` (${a.verifyItems.length} to verify)` : '';
+      ctx.io.out(`  ${a.createdAt.slice(0, 10)}  ${a.kind.padEnd(8)} ${a.path}${verify}`);
+    }
+  }
+  if (events.length) {
+    ctx.io.out('timeline');
+    for (const e of events) {
+      const p = e.payload;
+      const detail =
+        e.type === 'status_change'
+          ? `${String(p['from'])} -> ${String(p['to'])}${p['note'] ? `: ${String(p['note'])}` : ''}`
+          : e.type === 'note'
+            ? String(p['note'] ?? '')
+            : JSON.stringify(p);
+      ctx.io.out(`  ${e.at.slice(0, 10)}  ${e.type.padEnd(13)} ${detail}`);
+    }
+  }
+}
+
+async function importCvCmd(ctx: Ctx): Promise<void> {
+  const file = ctx.positionals[0];
+  if (!file) throw new CliError('Usage: jh import-cv <file.docx|.pdf|.txt> [--out file.txt]', 2);
+  const input = resolve(ctx.cwd, file);
+  if (!existsSync(input)) throw new CliError(`File not found: ${input}`, 2);
+  let imported;
+  try {
+    imported = await importCv(input);
+  } catch (error) {
+    throw new CliError(error instanceof Error ? error.message : String(error), 1);
+  }
+  const out = resolve(
+    ctx.cwd,
+    ctx.values.out ?? join('data', 'imports', `${basename(input, extname(input))}.txt`),
+  );
+  mkdirSync(dirname(out), { recursive: true });
+  writeFileSync(out, `${imported.text}\n`, 'utf8');
+  if (ctx.values.json) {
+    ctx.io.out(JSON.stringify({ ...imported, out }, null, 2));
+    return;
+  }
+  const pages =
+    imported.pages !== undefined
+      ? `, ${imported.pages} page${imported.pages === 1 ? '' : 's'}`
+      : '';
+  ctx.io.err(
+    `Read ${imported.format.toUpperCase()}${pages}, ${imported.text.length} characters. Wrote ${out}`,
+  );
+  ctx.io.out(imported.text);
+}
+
+function doctor(ctx: Ctx): void {
+  const dir = resolve(ctx.cwd, ctx.values['config-dir'] ?? 'config');
+  const masterPath = resolve(ctx.cwd, ctx.values.master ?? 'data/master.json');
+  const checks: Array<{ name: string; ok: boolean; detail: string }> = [];
+
+  const tryCheck = (name: string, fn: () => string) => {
+    try {
+      checks.push({ name, ok: true, detail: fn() });
+    } catch (error) {
+      checks.push({
+        name,
+        ok: false,
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  tryCheck('config/profile.yaml', () => {
+    const p = loadProfile(join(dir, 'profile.yaml'));
+    return `${p.name}, ${p.yearsExperience} years, ${p.targetTitles.length} target titles`;
+  });
+  tryCheck('config/rules.yaml', () => {
+    const r = loadRules(join(dir, 'rules.yaml'));
+    return `years bar ${r.experience.maxYearsBar}, ${r.style.maxPages} pages, ${Object.keys(r.salary).length} salary bands`;
+  });
+  tryCheck('data/master.json', () => {
+    if (!existsSync(masterPath)) {
+      throw new Error(`${masterPath}: not found. Run /setup to draft it from your CV.`);
+    }
+    const result = Master.safeParse(JSON.parse(readFileSync(masterPath, 'utf8')));
+    if (!result.success) {
+      const issues = result.error.issues
+        .map((i) => `  - ${i.path.join('.') || '(root)'}: ${i.message}`)
+        .join('\n');
+      throw new Error(`${masterPath}: invalid.\n${issues}`);
+    }
+    const m = result.data;
+    return `${m.name}, ${m.experience.length} positions, ${m.projects.length} projects, ${m.skills.length} skill groups`;
+  });
+  tryCheck('database', () => {
+    const t = ctx.tracker();
+    return `${t.path} (${getStats(t.db, ctx.today).total} jobs)`;
+  });
+  tryCheck('LibreOffice', () => {
+    const soffice = findSoffice();
+    if (!soffice) {
+      throw new Error(
+        'soffice not found: install LibreOffice or set SOFFICE. PDF rendering will fail until then.',
+      );
+    }
+    return soffice;
+  });
+
+  if (ctx.values.json) {
+    ctx.io.out(JSON.stringify(checks, null, 2));
+  } else {
+    for (const c of checks) {
+      const [first, ...rest] = c.detail.split('\n');
+      ctx.io.out(`${c.ok ? 'ok  ' : 'FAIL'} ${c.name.padEnd(20)} ${first ?? ''}`);
+      for (const line of rest) ctx.io.out(`     ${line}`);
+    }
+  }
+  const failed = checks.filter((c) => !c.ok && c.name !== 'LibreOffice');
+  if (failed.length) {
+    throw new CliError(`${failed.length} check${failed.length === 1 ? '' : 's'} failed`, 1);
   }
 }

@@ -61,8 +61,11 @@ pnpm jh list [--status S]... [--min-score N] [--company C] [--source S] [--batch
 pnpm jh set-status <id> <status> [--note text] [--follow-up YYYY-MM-DD]
 pnpm jh note <id> <text>
 pnpm jh score <id> [--why text] [--gap text] [--visa-note text] [--min-years N] [--requirements "a, b"]
+pnpm jh show <id> [--json]
 pnpm jh stats [--json]
 pnpm jh export-csv [file]
+pnpm jh import-cv <file.docx|.pdf|.txt> [--out file.txt]
+pnpm jh doctor [--json]
 ```
 
 `add-jobs` accepts a JSON array of scout rows or `{jobs, rejected}`, validates them against `JobInput`, dedupes against the tracker and within the batch, scores each new row with the rules and `data/master.json`, and records a search run. Moving a job to `Applied` sets the follow-up date from `rules.followUpDays` unless `--follow-up` is given. Global options: `--db <path>` (or `JH_DB`), `--config-dir <dir>`, `--master <file>`.
@@ -76,6 +79,9 @@ pnpm jh export-csv [file]
 - `lintText(text, { bannedCharacters, bannedPhrases })` flags em dashes by default plus anything from `rules.style`, with line and column.
 - `renderCoverLetterDocx(letter)` and `renderDocumentDocx(doc)` are the other two prototype renderers ported: a one-page cover letter and a generic title, sections, bullets and key-value document. `documentToMarkdown` renders the same document as Markdown.
 - `renderPackMarkdown(pack)` is the `pack.md` template (SPEC F6): posting links and file paths, posting rules to read first, the cover note, why this role, screening answers with their source, and the "Verify before sending" list. `packFolder(company, role)` gives `output/<company>/<role>`.
+
+### Setup skill (`/setup`)
+`.claude/skills/setup-profile/SKILL.md` walks a new user from an existing CV to validated config: `pnpm jh import-cv <cv>` extracts the text (DOCX via the zip, PDF via pdf.js) into `data/imports/`, Claude drafts `data/master.json` from it without embellishing, interviews for what the CV does not hold, writes `config/profile.yaml` and `config/rules.yaml` from the examples, and `pnpm jh doctor` validates all three files, opens the database and checks for LibreOffice.
 
 ## Status
 Work in progress. See `docs/SPEC.md` and `docs/TASKS.md`.

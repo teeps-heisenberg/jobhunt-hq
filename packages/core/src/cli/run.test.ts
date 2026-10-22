@@ -344,3 +344,85 @@ describe('extractSkills', () => {
     expect(extractSkills(null)).toEqual([]);
   });
 });
+
+describe('show, import-cv, doctor', () => {
+  it('shows one job with timeline and artifacts', async () => {
+    await jh('add-jobs', writeScout('one.json', [scoutRows[0]]));
+    await jh('set-status', 'acme-full-stack-engineer-eu', 'Applied', '--note', 'via form');
+    await jh('note', 'acme-full-stack-engineer-eu', 'Recruiter replied');
+    out = [];
+    expect(await jh('show', 'acme-full-stack-engineer-eu')).toBe(0);
+    const text = out.join('\n');
+    expect(text.split('\n')[0]).toBe('Acme: Full Stack Engineer');
+    expect(text).toMatch(/^status\s+Applied$/m);
+    expect(text).toMatch(/^why\s+Stack matches\.$/m);
+    expect(text).toContain('notes\n  2026-10-22: Recruiter replied');
+    expect(text).toMatch(
+      /timeline\n.*status_change\s+Shortlisted -> Applied: via form\n.*note\s+Recruiter replied/,
+    );
+    expect(text).not.toContain('artifacts');
+
+    out = [];
+    await jh('show', 'acme-full-stack-engineer-eu', '--json');
+    const json = JSON.parse(out.join('\n'));
+    expect(json.events).toHaveLength(2);
+    expect(json.artifacts).toEqual([]);
+    expect(await jh('show', 'missing')).toBe(1);
+  });
+
+  it('imports a CV to data/imports and prints the text', async () => {
+    const src = join(cwd, 'my cv.txt');
+    writeFileSync(src, 'Sam Rivera\nEngineer\n');
+    expect(await jh('import-cv', src)).toBe(0);
+    expect(out.join('\n')).toBe('Sam Rivera\nEngineer');
+    expect(err[0]).toMatch(/Read TXT, 19 characters\. Wrote .*data[\\/]imports[\\/]my cv\.txt/);
+    expect(readFileSync(join(cwd, 'data/imports/my cv.txt'), 'utf8')).toBe(
+      'Sam Rivera\nEngineer\n',
+    );
+
+    out = [];
+    expect(await jh('import-cv', src, '--out', 'cv.txt', '--json')).toBe(0);
+    expect(JSON.parse(out.join('\n'))).toMatchObject({
+      format: 'txt',
+      text: 'Sam Rivera\nEngineer',
+    });
+    expect(readFileSync(join(cwd, 'cv.txt'), 'utf8')).toBe('Sam Rivera\nEngineer\n');
+
+    expect(await jh('import-cv', join(cwd, 'nope.pdf'))).toBe(2);
+    writeFileSync(join(cwd, 'cv.odt'), 'x');
+    expect(await jh('import-cv', join(cwd, 'cv.odt'))).toBe(1);
+    expect(err.at(-1)).toMatch(/Unsupported CV format/);
+  });
+
+  it('doctor passes with the example files and fails on a broken one', async () => {
+    expect(await jh('doctor')).toBe(0);
+    const text = out.join('\n');
+    expect(text).toMatch(/^ok {3}config\/profile\.yaml\s+Sam Rivera, 3 years, 4 target titles$/m);
+    expect(text).toMatch(/^ok {3}config\/rules\.yaml\s+years bar 4, 2 pages, 4 salary bands$/m);
+    expect(text).toMatch(
+      /^ok {3}data\/master\.json\s+Sam Rivera, 2 positions, 3 projects, 6 skill groups$/m,
+    );
+    expect(text).toMatch(/^ok {3}database\s+.*jobhunt\.db \(0 jobs\)$/m);
+    expect(text).toMatch(/^(ok {3}|FAIL) LibreOffice/m);
+
+    writeFileSync(join(cwd, 'data/master.json'), JSON.stringify({ name: 'X' }));
+    out = [];
+    err = [];
+    expect(await jh('doctor', '--config-dir', 'nowhere')).toBe(1);
+    const failed = out.join('\n');
+    expect(failed).toMatch(/^FAIL config\/profile\.yaml\s+.*profile\.yaml: not found/m);
+    expect(failed).toMatch(/^FAIL data\/master\.json\s+.*invalid\.\n {5} {2}- title: /m);
+    expect(err.at(-1)).toBe('3 checks failed');
+
+    out = [];
+    await jh('doctor', '--json');
+    const checks = JSON.parse(out.join('\n')) as Array<{ name: string; ok: boolean }>;
+    expect(checks.map((c) => c.name)).toEqual([
+      'config/profile.yaml',
+      'config/rules.yaml',
+      'data/master.json',
+      'database',
+      'LibreOffice',
+    ]);
+  });
+});
