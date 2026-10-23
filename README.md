@@ -2,7 +2,7 @@
 
 **An open-source, Claude Code native job-search kit.** Describe yourself once. Claude Code finds roles you can realistically get, scores them honestly, tailors a truthful two-page CV and cover note for each, helps fill application forms without ever submitting, and tracks everything in a local dashboard.
 
-![The tracker table: score, status, company, role, location, follow-up date, why it fits and the main gap](docs/images/dashboard-table.jpg)
+![JobHunt HQ in 80 seconds: scouted rows scored by the CLI, the tracker table, the kanban board, a tailored CV with its verify list, and an application form filled without clicking Submit](docs/images/demo.gif)
 
 > Built from a real three-week test run: 509 roles tracked across 378 companies, 132 tailored CVs, 53 applications, 8 responses. This repo turns that workflow into something anyone can run with their own preferences.
 
@@ -33,7 +33,7 @@ Then open Claude Code in the folder and run the skills in order:
 
 Meanwhile `pnpm dev` runs the dashboard on http://localhost:3000. Just looking? `pnpm demo` starts it on a throwaway database filled with fictional data.
 
-![The kanban board: drag a card to change its status](docs/images/dashboard-board.jpg)
+![The tracker table: score, status, company, role, location, follow-up date, why it fits and the main gap](docs/images/dashboard-table.jpg)
 
 ## How it works
 ```

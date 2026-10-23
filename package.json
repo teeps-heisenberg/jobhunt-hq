@@ -22,7 +22,8 @@
     "dev": "pnpm --filter @jobhunt-hq/dashboard dev",
     "build": "pnpm --filter @jobhunt-hq/dashboard build",
     "demo": "node scripts/demo.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "record:demo": "node scripts/record-demo.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
