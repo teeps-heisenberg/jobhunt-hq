@@ -851,6 +851,18 @@ function doctor(ctx: Ctx): void {
     }
   }
   const failed = checks.filter((c) => !c.ok && c.name !== 'LibreOffice');
+  if (failed.length && !ctx.values.json) {
+    const setupMissing = failed.some(
+      (c) => c.name.startsWith('config/') || c.name === 'data/master.json',
+    );
+    ctx.io.out('');
+    ctx.io.out(
+      setupMissing
+        ? 'Next: open Claude Code in this folder and run /setup. It imports your CV and writes these files.'
+        : 'Next: fix the fields listed above, then run pnpm jh doctor again.',
+    );
+    ctx.io.out('Just looking? pnpm demo starts the dashboard on fictional example data.');
+  }
   if (failed.length) {
     throw new CliError(`${failed.length} check${failed.length === 1 ? '' : 's'} failed`, 1);
   }

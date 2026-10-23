@@ -462,6 +462,8 @@ describe('show, import-cv, doctor', () => {
     expect(failed).toMatch(/^FAIL config\/profile\.yaml\s+.*profile\.yaml: not found/m);
     expect(failed).toMatch(/^FAIL data\/master\.json\s+.*invalid\.\n {5} {2}- title: /m);
     expect(err.at(-1)).toBe('3 checks failed');
+    expect(failed).toContain('Next: open Claude Code in this folder and run /setup.');
+    expect(failed).toContain('pnpm demo starts the dashboard');
 
     out = [];
     await jh('doctor', '--json');
