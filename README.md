@@ -4,7 +4,7 @@
 
 ![JobHunt HQ in 80 seconds: scouted rows scored by the CLI, the tracker table, the kanban board, a tailored CV with its verify list, and an application form filled without clicking Submit](docs/images/demo.gif)
 
-> Built from a real three-week test run: 509 roles tracked across 378 companies, 132 tailored CVs, 53 applications, 8 responses. This repo turns that workflow into something anyone can run with their own preferences.
+> It started as a personal workflow. This repo turns it into a kit anyone can run with their own preferences.
 
 ## Why
 Most job tools match keywords. JobHunt HQ filters for what actually blocks you (visa, location, years bar, language, clearance) and tells you the gap before you spend an hour on an application. Everything it writes comes from your own master CV, and every sentence it cannot trace back is listed for you to verify.

@@ -2,7 +2,7 @@
 
 An open-source, Claude Code native job-search kit. You describe yourself once (profile, rules, master résumé). Claude Code then finds roles that fit, scores them honestly, tailors a two-page résumé and cover note per role, helps fill application forms in a browser **without ever submitting**, and tracks everything in a local dashboard.
 
-It grew out of a personal test run (29 Sep to 21 Oct 2026): 509 roles tracked across 378 companies, 132 tailored CVs, 53 applications, 8 responses. This repo turns that workflow into something anyone can run with their own preferences.
+It grew out of a personal workflow. This repo turns that workflow into something anyone can run with their own preferences.
 
 ## 1. Users and jobs to be done
 - **Primary:** software engineers (and other knowledge workers) running an active search, especially people who apply across borders and need to filter for visa sponsorship, remote eligibility and years-of-experience bars.
