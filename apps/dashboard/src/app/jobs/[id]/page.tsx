@@ -23,7 +23,10 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
   if (!job) notFound();
   const events = listEvents(db, id).reverse();
   const artifacts = listArtifacts(db, id);
-  const verify = [...new Set(artifacts.flatMap((a) => a.verifyItems))];
+  // The pack repeats the CV's items with a `cv.` prefix; show each claim once.
+  const verify = [
+    ...new Set(artifacts.flatMap((a) => a.verifyItems).map((v) => v.replace(/^cv\./, ''))),
+  ];
 
   return (
     <div className="grid gap-4 lg:grid-cols-3">

@@ -657,7 +657,7 @@ describe('pack', () => {
     );
     expect(text).toContain('- Notice period: 2 weeks, negotiable');
     expect(text).not.toContain('Notice period: 1 month');
-    expect(text).toContain('- Work authorisation: Can work in Remote - EU without sponsorship');
+    expect(text).toContain('- Work authorisation: Can work remotely from EU without sponsorship');
     expect(text).toContain('verify before sending (2):');
     expect(text).toContain('- used by 200 clinics (cover.para 1)');
     expect(text).toContain('- Led a team of four engineers. (cv.experience.Example Agency)');

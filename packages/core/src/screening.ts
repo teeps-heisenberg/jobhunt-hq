@@ -52,11 +52,19 @@ export function standardScreening(
     });
   }
 
+  // "Remote - EU" reads badly in a sentence: name the place, and say "remotely" instead.
+  const remotePlace = job.location
+    .replace(/^\s*remote\s*[-:(,]?\s*/i, '')
+    .replace(/\)\s*$/, '')
+    .trim();
+  const where = job.remote
+    ? `remotely from ${remotePlace || job.region || 'my current location'}`
+    : `in ${job.location}`;
   answers.push({
     question: 'Work authorisation',
     answer: location.needsSponsorship
-      ? `Needs visa sponsorship for ${job.location}; can work without sponsorship in ${profile.citizenship.join(', ')}`
-      : `Can work in ${job.location} without sponsorship`,
+      ? `Needs visa sponsorship to work ${where}; can work without sponsorship in ${profile.citizenship.join(', ')}`
+      : `Can work ${where} without sponsorship`,
     source: 'profile.citizenship, rules.visa',
   });
 

@@ -31,10 +31,26 @@ describe('standardScreening', () => {
       { question: 'Notice period', answer: '1 month', source: 'profile.noticePeriod' },
       {
         question: 'Work authorisation',
-        answer: 'Needs visa sponsorship for London, UK; can work without sponsorship in Portugal',
+        answer:
+          'Needs visa sponsorship to work in London, UK; can work without sponsorship in Portugal',
         source: 'profile.citizenship, rules.visa',
       },
     ]);
+  });
+
+  it('words work authorisation for remote and on-site roles', () => {
+    const auth = (location: string, remote: boolean) =>
+      standardScreening({ location, region: null, remote }, profile, rules).at(-1)?.answer;
+    expect(auth('Remote - EU', true)).toBe('Can work remotely from EU without sponsorship');
+    expect(auth('Remote (Portugal)', true)).toBe(
+      'Can work remotely from Portugal without sponsorship',
+    );
+    expect(auth('Remote', true)).toBe(
+      'Can work remotely from my current location without sponsorship',
+    );
+    expect(auth('Lisbon, Portugal', false)).toBe(
+      'Can work in Lisbon, Portugal without sponsorship',
+    );
   });
 
   it('uses the remote band for remote roles and the profile target when no band matches', () => {
